@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
-import "../src/LazerToken.sol";
+import "../src/BalanceManager.sol";
 
 interface ImmutableCreate2Factory {
     function hasBeenDeployed(address deploymentAddress) external view returns (bool);
@@ -36,6 +36,7 @@ contract CrossChainDeployScript is Script {
     mapping(uint256 => string) chainToBlockExplorer;
 
     // Set up the immutable create2 factory and conduit controller addresses.
+    // this is an already deployed address of z0age's CREATE2Factory contract
     ImmutableCreate2Factory private constant IMMUTABLE_CREATE2_FACTORY =
         ImmutableCreate2Factory(0x0000000000FFe8B47B3e2130213B802212439497);
 
@@ -51,8 +52,8 @@ contract CrossChainDeployScript is Script {
     function run() public {
         vm.startBroadcast();
 
-        // Create a new LazerToken contract.
-        deploy(bytes.concat(type(LazerToken).creationCode, abi.encode("LazerToken", "LZR", msg.sender)));
+        // Create a new BalanceManager contract.
+        deploy(bytes.concat(type(BalanceManager).creationCode, abi.encode(msg.sender)));
 
         vm.stopBroadcast();
     }
