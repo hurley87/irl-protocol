@@ -1,3 +1,3 @@
 # Building Smart Contracts in Foundry
 
-lorem ipsum lazum forgum
+TODO: build out a brief tutorial on deploying, testing, scripts, and best practices
