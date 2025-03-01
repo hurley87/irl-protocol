@@ -1,0 +1,101 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "openzeppelin-contracts/token/ERC20/ERC20.sol";
+import "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import "openzeppelin-contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "openzeppelin-contracts/token/ERC20/extensions/ERC20Pausable.sol";
+import "openzeppelin-contracts/access/Ownable.sol";
+import "openzeppelin-contracts/token/ERC20/extensions/ERC20Permit.sol";
+import "openzeppelin-contracts/token/ERC20/extensions/ERC20Votes.sol";
+
+using SafeERC20 for IERC20;
+
+/**
+ * @title InflationToken
+ * @author [Jon Bray](https://warpcast.com/jonbray.eth)
+ * @notice This is an ERC20 token with an inflation mechanic that allows the
+ *         token to be minted at a rate of 5% per year, enforcing a 365 day
+ *         period between mints. The 5% rate is applied to the initial supply,
+ *         not the total supply.
+ */
+contract InflationToken is ERC20, ERC20Burnable, ERC20Pausable, ERC20Permit, ERC20Votes, Ownable {
+    string public constant TOKEN_NAME = "InflationToken";
+    string public constant TOKEN_SYMBOL = "INFLA";
+    uint256 public constant TOKEN_INITIAL_SUPPLY = 1_000_000_000;
+    uint32 public constant MINIMUM_TIME_BETWEEN_MINTS = 365 days;
+    uint8 public constant MINT_CAP = 5;
+
+    uint256 public mintingAllowedAfter;
+
+    error MintingDateNotReached();
+    error MintToZeroAddressBlocked();
+    error MintToContractAddressBlocked();
+    error MintCapExceeded();
+
+    constructor() ERC20(TOKEN_NAME, TOKEN_SYMBOL) ERC20Permit(TOKEN_NAME) Ownable(msg.sender) {
+        _mint(msg.sender, TOKEN_INITIAL_SUPPLY * 10 ** decimals());
+        mintingAllowedAfter = block.timestamp + MINIMUM_TIME_BETWEEN_MINTS;
+    }
+
+    /**
+     * @dev mint new tokens for inflation mechanic
+     * @dev inflation is fixed 5% per year max based on initial supply
+     * @param to The address of the target account
+     * @param amount The number of tokens to be minted
+     */
+    function mint(address to, uint256 amount) external onlyOwner {
+        if (block.timestamp < mintingAllowedAfter) {
+            revert MintingDateNotReached();
+        }
+        if (to == address(0)) {
+            revert MintToZeroAddressBlocked();
+        }
+        if (to == address(this)) {
+            revert MintToContractAddressBlocked();
+        }
+
+        // enforce 5% inflation cap
+        uint256 cap = (TOKEN_INITIAL_SUPPLY * MINT_CAP) / 100;
+        if (amount > cap) {
+            revert MintCapExceeded();
+        }
+
+        // enforce 365 day period between mints
+        mintingAllowedAfter = block.timestamp + MINIMUM_TIME_BETWEEN_MINTS;
+        _mint(to, amount);
+    }
+
+    /**
+     * @dev recover tokens sent to the contract address
+     * @param token the address of the token to recover
+     * @param amount the amount of tokens to recover
+     * @param to the address to send the recovered tokens to
+     */
+    function recoverTokens(address token, uint256 amount, address to) external onlyOwner {
+        IERC20(token).safeTransfer(to, amount);
+    }
+
+    /**
+     * @dev pause all token transfers
+     */
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @dev unpause all token transfers
+     */
+    function unpause() public onlyOwner {
+        _unpause();
+    }
+
+    // the following functions are overrides required by Solidity.
+    function _update(address from, address to, uint256 value) internal override(ERC20, ERC20Pausable, ERC20Votes) {
+        super._update(from, to, value);
+    }
+
+    function nonces(address owner) public view override(ERC20Permit, Nonces) returns (uint256) {
+        return super.nonces(owner);
+    }
+}
