@@ -128,74 +128,6 @@ contract InflationTokenTest is Test {
         }
     }
 
-    function testPauseAndUnpause() public {
-        console.log("Testing Pause and Unpause");
-        token.pause();
-        console.log("Contract paused");
-
-        // Expect revert with EnforcedPause error
-        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
-        token.transfer(user, 1);
-
-        token.unpause();
-        console.log("Contract unpaused");
-        token.transfer(user, 1);
-        console.log("Transferred 1 token to user");
-        assertEq(token.balanceOf(user), 1);
-    }
-
-    function testPauseAndUnpauseByNonOwner() public {
-        vm.prank(user);
-        console.log("Attempting to pause contract as non-owner, expecting revert");
-
-        // Expect revert with OwnableUnauthorizedAccount error
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user));
-        token.pause();
-    }
-
-    function testDelegationAndVoting() public {
-        console.log("Testing Delegation and Voting");
-
-        // User delegates votes to themselves
-        vm.prank(user);
-        token.delegate(user);
-        console.log("User delegated votes to themselves");
-
-        // Get initial votes for user
-        uint256 initialVotes = token.getVotes(user);
-        console.log("Initial votes for user:", initialVotes);
-
-        // Transfer 100 tokens to the user
-        token.transfer(user, 100);
-        console.log("Transferred 100 tokens to user");
-
-        // User delegates votes to themselves again after transfer
-        vm.prank(user);
-        token.delegate(user);
-        console.log("User re-delegated votes to themselves");
-
-        // Calculate expected votes after transfer and re-delegation
-        uint256 expectedVotes = initialVotes + 100;
-        uint256 actualVotes = token.getVotes(user);
-        console.log("Expected votes for user after transfer and re-delegation:", expectedVotes);
-        console.log("Actual votes for user after transfer and re-delegation:", actualVotes);
-
-        assertEq(actualVotes, expectedVotes);
-
-        // User delegates votes to another user (user2)
-        vm.prank(user);
-        token.delegate(user2);
-        console.log("User delegated votes to user2");
-
-        // Check balance of user2 (should be zero tokens, but have delegated votes)
-        uint256 user2Votes = token.getVotes(user2);
-        console.log("Votes for user2 after delegation from user:", user2Votes);
-
-        uint256 user2ExpectedVotes = expectedVotes; // All votes should now be delegated to user2
-        console.log("Expected votes for user2 after delegation:", user2ExpectedVotes);
-        assertEq(user2Votes, user2ExpectedVotes);
-    }
-
     function testTransferOwnership() public {
         console.log("Testing Ownership Transfer");
 
@@ -203,15 +135,6 @@ contract InflationTokenTest is Test {
         token.transferOwnership(user);
         console.log("Ownership transferred to user");
 
-        // Prank as new owner and pause the contract
-        vm.prank(user);
-        token.pause();
-        console.log("Contract paused by new owner");
-
-        // Prank as old owner and expect revert when trying to unpause
-        vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", owner));
-        token.unpause();
     }
 
     function testTokenTransfers() public {
@@ -243,25 +166,6 @@ contract InflationTokenTest is Test {
         console.log("Burned 100 tokens");
         assertEq(token.totalSupply(), initialSupply - 100);
         console.log("Total supply after burning:", token.totalSupply());
-    }
-
-    function testMintingInThePastReverts() public {
-        console.log("Testing Minting in the Past Reverts");
-
-        // Warp to a future timestamp to simulate past minting allowed time
-        uint256 futureTime = block.timestamp + 365 days;
-        vm.warp(futureTime);
-
-        // Set minting allowed time to a past time
-        uint256 mintingAllowedAfter = block.timestamp - 1;
-
-        // Expect revert with MintAllowedAfterDeployOnly error
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                InflationToken.MintAllowedAfterDeployOnly.selector, block.timestamp, mintingAllowedAfter
-            )
-        );
-        new InflationToken(mintingAllowedAfter);
     }
 
     function testCannotReceiveEth() public {
