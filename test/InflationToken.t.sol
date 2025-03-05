@@ -134,7 +134,6 @@ contract InflationTokenTest is Test {
         // Transfer ownership to user
         token.transferOwnership(user);
         console.log("Ownership transferred to user");
-
     }
 
     function testTokenTransfers() public {
