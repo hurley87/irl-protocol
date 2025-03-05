@@ -40,88 +40,71 @@ contract InflationTokenTest is Test {
 
     function testInflation() public {
         uint256 initialSupply = 1_000_000_000 * 10 ** token.decimals();
-        console.log("Testing Inflation");
-        // fast forward 1 year
+
+        // Try minting after 1 day - should fail
+        vm.warp(block.timestamp + 1 days);
+        console.log("Fast forwarded 1 day");
+        vm.expectRevert(InflationToken.MintingDateNotReached.selector);
+        token.mint(owner);
+
+        // Try minting after 1 year - should succeed
         vm.warp(block.timestamp + 365 days);
-        console.log("Fast forwarded 1 year");
+        console.log("Fast forwarded to 1 year");
+        token.mint(owner);
+        assertEq(token.totalSupply(), initialSupply + token.MINT_CAP());
 
-        uint256 mintAmount = (initialSupply * 4) / 100;
-        console.log("Minting 4% of the total supply:", mintAmount);
-        token.mint(owner, mintAmount);
+        // Try minting after 1 more day - should fail
+        vm.warp(block.timestamp + 1 days);
+        console.log("Fast forwarded 1 more day");
+        vm.expectRevert(InflationToken.MintingDateNotReached.selector);
+        token.mint(owner);
 
-        uint256 expectedSupply = initialSupply + mintAmount;
-        console.log("Expected supply after minting 4%:", expectedSupply);
-        console.log("Actual supply after minting 4%:", token.totalSupply());
-        assertEq(token.totalSupply(), expectedSupply);
-
-        // mint another 1% of the total supply
-        mintAmount = (token.totalSupply() * 1) / 100;
-        console.log("Minting 1% of the total supply:", mintAmount);
-        token.mint(owner, mintAmount);
-
-        expectedSupply += mintAmount;
-        console.log("Expected supply after minting another 1%:", expectedSupply);
-        console.log("Actual supply after minting another 1%:", token.totalSupply());
-        assertEq(token.totalSupply(), expectedSupply);
-
-        // try to mint another 1%, should fail due to cap
-        mintAmount = (token.totalSupply() * 1) / 100;
-        console.log("Attempting to mint another 1%, expecting revert due to cap");
-        vm.expectRevert(InflationToken.MintCapExceeded.selector);
-        token.mint(owner, mintAmount);
-
-        // fast forward another year and ensure minting works again
+        // Try minting after another year - should succeed
         vm.warp(block.timestamp + 365 days);
-        console.log("Fast forwarded another year");
-        token.mint(owner, mintAmount);
-        expectedSupply += mintAmount;
-        console.log("Expected supply after minting another 1%:", expectedSupply);
-        console.log("Actual supply after minting another 1%:", token.totalSupply());
-        assertEq(token.totalSupply(), expectedSupply);
+        console.log("Fast forwarded to 2 years");
+        token.mint(owner);
+        assertEq(token.totalSupply(), initialSupply + (token.MINT_CAP() * 2));
     }
 
     function testMintToContractAddressBlocked() public {
         vm.warp(block.timestamp + 365 days);
-        uint256 mintAmount = (token.totalSupply() * 1) / 100;
 
         console.log("Attempting to mint to contract address, expecting revert");
-        vm.expectRevert(InflationToken.MintToContractAddressBlocked.selector);
-        token.mint(address(token), mintAmount);
+        vm.expectRevert(InflationToken.CannotMintToBlockedAddress.selector);
+        token.mint(address(token));
     }
 
     function testRecoverTokens() public {
         vm.warp(block.timestamp + 365 days);
-        uint256 mintAmount = (token.totalSupply() * 1) / 100;
-        token.mint(owner, mintAmount);
-        token.transfer(address(token), mintAmount);
+        token.mint(owner);
+        token.transfer(address(token), token.MINT_CAP());
 
         uint256 contractBalanceBefore = token.balanceOf(address(token));
         console.log("Contract balance before recovery:", contractBalanceBefore);
         uint256 ownerBalanceBefore = token.balanceOf(owner);
         console.log("Owner balance before recovery:", ownerBalanceBefore);
 
-        token.recoverTokens(address(token), mintAmount, owner);
+        token.recoverTokens(address(token), token.MINT_CAP(), owner);
 
         uint256 contractBalanceAfter = token.balanceOf(address(token));
         uint256 ownerBalanceAfter = token.balanceOf(owner);
         console.log("Contract balance after recovery:", contractBalanceAfter);
         console.log("Owner balance after recovery:", ownerBalanceAfter);
 
-        assertEq(contractBalanceAfter, contractBalanceBefore - mintAmount);
-        assertEq(ownerBalanceAfter, ownerBalanceBefore + mintAmount);
+        assertEq(contractBalanceAfter, contractBalanceBefore - token.MINT_CAP());
+        assertEq(ownerBalanceAfter, ownerBalanceBefore + token.MINT_CAP());
     }
 
     function testTotalSupplyAfterInflation() public {
         console.log("Testing Total Supply After Inflation for 5 years");
-        console.log("Inflation is a constant 5% of the initial supply on launch");
+        console.log("Inflation is a constant 5% of the initial supply each year");
         uint256 initialSupply = 1_000_000_000 * 10 ** token.decimals();
-        uint256 mintAmount = (initialSupply * 5) / 100; // Flat 5% of the initial supply each year
 
         for (uint256 year = 1; year <= 5; year++) {
             vm.warp(block.timestamp + 365 days);
-            token.mint(owner, mintAmount);
-            uint256 expectedSupply = initialSupply + (mintAmount * year);
-            console.log("Year", year, "- Minted amount:", mintAmount);
+            token.mint(owner);
+            uint256 expectedSupply = initialSupply + (token.MINT_CAP() * year);
+            console.log("Year", year, "- Minted amount:", token.MINT_CAP());
             console.log("Year", year, "- Expected Total Supply:", expectedSupply);
             console.log("Year", year, "- Actual Total Supply:", token.totalSupply());
             assertEq(token.totalSupply(), expectedSupply);
@@ -130,8 +113,6 @@ contract InflationTokenTest is Test {
 
     function testTransferOwnership() public {
         console.log("Testing Ownership Transfer");
-
-        // Transfer ownership to user
         token.transferOwnership(user);
         console.log("Ownership transferred to user");
     }

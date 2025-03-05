@@ -20,14 +20,14 @@ contract InflationToken is ERC20, ERC20Burnable, Ownable {
     string public constant TOKEN_NAME = "InflationToken";
     string public constant TOKEN_SYMBOL = "INFLA";
     uint256 public constant TOKEN_INITIAL_SUPPLY = 1_000_000_000;
+    uint256 public constant MINT_CAP = 50_000_000;
     uint32 public constant MINIMUM_TIME_BETWEEN_MINTS = 365 days;
-    uint8 public constant MINT_CAP = 5;
 
     uint256 public mintingAllowedAfter;
+    uint256 public amountMintedInCurrentYear;
 
     error MintingDateNotReached();
-    error MintToZeroAddressBlocked();
-    error MintToContractAddressBlocked();
+    error CannotMintToBlockedAddress();
     error MintCapExceeded();
 
     constructor() ERC20(TOKEN_NAME, TOKEN_SYMBOL) Ownable() {
@@ -39,28 +39,18 @@ contract InflationToken is ERC20, ERC20Burnable, Ownable {
      * @dev mint new tokens for inflation mechanic
      * @dev inflation is fixed 5% per year max based on initial supply
      * @param to The address of the target account
-     * @param amount The number of tokens to be minted
      */
-    function mint(address to, uint256 amount) external onlyOwner {
+    function mint(address to) external onlyOwner {
         if (block.timestamp < mintingAllowedAfter) {
             revert MintingDateNotReached();
         }
-        if (to == address(0)) {
-            revert MintToZeroAddressBlocked();
-        }
-        if (to == address(this)) {
-            revert MintToContractAddressBlocked();
-        }
-
-        // enforce 5% inflation cap
-        uint256 cap = (TOKEN_INITIAL_SUPPLY * MINT_CAP) / 100;
-        if (amount > cap) {
-            revert MintCapExceeded();
+        if (to == address(0) || to == address(this)) {
+            revert CannotMintToBlockedAddress();
         }
 
         // enforce 365 day period between mints
         mintingAllowedAfter = block.timestamp + MINIMUM_TIME_BETWEEN_MINTS;
-        _mint(to, amount);
+        _mint(to, MINT_CAP);
     }
 
     /**

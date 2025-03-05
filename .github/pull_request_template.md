@@ -10,6 +10,7 @@
 
 ## Checklist
 
-- [ ] No `forge fmt` errors
-- [ ] No `forge build` errors
-- [ ] Documentation up to date
+- [ ] `forge fmt`
+- [ ] `forge test`
+- [ ] `forge build`
+- [ ] docs are up to date
