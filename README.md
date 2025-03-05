@@ -1,4 +1,4 @@
-![](.github/lazerforge_logo_pink.png)
+![LazerForge Logo](.github/lazerforge_logo_pink.png)
 
 # LazerForge
 
@@ -50,7 +50,7 @@ When running commands like `forge verify-contract` (or using the `--verify` flag
 
 **Example:**
 
-```
+```bash
 forge verify-contract --chain ethereum <contract_address> <contract_path>
 ```
 
@@ -109,7 +109,7 @@ export DEPLOYER_PRIVATE_KEY='<your_pk>'
 Tests are handled through test files, written in Solidity and using the naming convention `Contract.t.sol`
 
 ```shell
-$ forge test
+forge test
 ```
 
 ### Deploy
@@ -117,7 +117,7 @@ $ forge test
 Deployments are handled through script files, written in Solidity and using the naming convention `Contract.s.sol`. You can run a script directly from your CLI
 
 ```bash
-$ forge script script/MyContract.s.sol:MyContractScript --rpc-url <your_rpc_url> --private-key <your_private_key> --chain-id <chain_id> -vv
+forge script script/MyContract.s.sol:MyContractScript --rpc-url <your_rpc_url> --private-key <your_private_key> --chain-id <chain_id> -vv
 ```
 
 > 💡 If a deployment script contains multiple functions, you can run a single function by appending the file name in the previous script like this `forge script script/MyScript.s.sol:MyFunction`.
@@ -127,13 +127,13 @@ Unless you include the `--broadcast` argument, the script will be run in a simul
 ⚠️ **Using `--broadcast` will initiate an onchain transaction, only use after thoroughly testing**
 
 ```bash
-$ forge script script/MyContract.s.sol:MyContractScript --rpc-url <your_rpc_url> --private-key <your_private_key> --chain-id 1 -vv --broadcast
+forge script script/MyContract.s.sol:MyContractScript --rpc-url <your_rpc_url> --private-key <your_private_key> --chain-id 1 -vv --broadcast
 ```
 
 Additional arguments can specity the chain and verbosity of the script
 
 ```bash
-$ forge script script/MyContract.s.sol:MyContractScript --rpc-url <your_rpc_url> --private-key <your_private_key> --chain-id 1 -vv
+forge script script/MyContract.s.sol:MyContractScript --rpc-url <your_rpc_url> --private-key <your_private_key> --chain-id 1 -vv
 ```
 
 Additionally, you can pass a private key directly into script functions to prevent exposing it in the command line (recommended).
@@ -168,7 +168,7 @@ When working across branches with different dependencies, submodules may need to
 Forge can generate gas snapshots for all test functions to see how much gas contracts will consume, or to compare gas usage before and after optimizations.
 
 ```shell
-$ forge snapshot
+forge snapshot
 ```
 
 ## Coverage Reports
