@@ -39,7 +39,7 @@ contract BalanceManager is Ownable, ReentrancyGuard {
         _;
     }
 
-    constructor(address initialOwner) Ownable(initialOwner) {}
+    constructor(address initialOwner) Ownable() {}
 
     function addAdmin(address admin) external onlyOwner {
         admins[admin] = true;
