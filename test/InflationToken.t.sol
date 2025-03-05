@@ -40,178 +40,81 @@ contract InflationTokenTest is Test {
 
     function testInflation() public {
         uint256 initialSupply = 1_000_000_000 * 10 ** token.decimals();
-        console.log("Testing Inflation");
-        // fast forward 1 year
+
+        // Try minting after 1 day - should fail
+        vm.warp(block.timestamp + 1 days);
+        console.log("Fast forwarded 1 day");
+        vm.expectRevert(InflationToken.MintingDateNotReached.selector);
+        token.mint(owner);
+
+        // Try minting after 1 year - should succeed
         vm.warp(block.timestamp + 365 days);
-        console.log("Fast forwarded 1 year");
+        console.log("Fast forwarded to 1 year");
+        token.mint(owner);
+        assertEq(token.totalSupply(), initialSupply + token.MINT_CAP());
 
-        uint256 mintAmount = (initialSupply * 4) / 100;
-        console.log("Minting 4% of the total supply:", mintAmount);
-        token.mint(owner, mintAmount);
+        // Try minting after 1 more day - should fail
+        vm.warp(block.timestamp + 1 days);
+        console.log("Fast forwarded 1 more day");
+        vm.expectRevert(InflationToken.MintingDateNotReached.selector);
+        token.mint(owner);
 
-        uint256 expectedSupply = initialSupply + mintAmount;
-        console.log("Expected supply after minting 4%:", expectedSupply);
-        console.log("Actual supply after minting 4%:", token.totalSupply());
-        assertEq(token.totalSupply(), expectedSupply);
-
-        // mint another 1% of the total supply
-        mintAmount = (token.totalSupply() * 1) / 100;
-        console.log("Minting 1% of the total supply:", mintAmount);
-        token.mint(owner, mintAmount);
-
-        expectedSupply += mintAmount;
-        console.log("Expected supply after minting another 1%:", expectedSupply);
-        console.log("Actual supply after minting another 1%:", token.totalSupply());
-        assertEq(token.totalSupply(), expectedSupply);
-
-        // try to mint another 1%, should fail due to cap
-        mintAmount = (token.totalSupply() * 1) / 100;
-        console.log("Attempting to mint another 1%, expecting revert due to cap");
-        vm.expectRevert(InflationToken.MintCapExceeded.selector);
-        token.mint(owner, mintAmount);
-
-        // fast forward another year and ensure minting works again
+        // Try minting after another year - should succeed
         vm.warp(block.timestamp + 365 days);
-        console.log("Fast forwarded another year");
-        token.mint(owner, mintAmount);
-        expectedSupply += mintAmount;
-        console.log("Expected supply after minting another 1%:", expectedSupply);
-        console.log("Actual supply after minting another 1%:", token.totalSupply());
-        assertEq(token.totalSupply(), expectedSupply);
+        console.log("Fast forwarded to 2 years");
+        token.mint(owner);
+        assertEq(token.totalSupply(), initialSupply + (token.MINT_CAP() * 2));
     }
 
     function testMintToContractAddressBlocked() public {
         vm.warp(block.timestamp + 365 days);
-        uint256 mintAmount = (token.totalSupply() * 1) / 100;
 
         console.log("Attempting to mint to contract address, expecting revert");
-        vm.expectRevert(InflationToken.MintToContractAddressBlocked.selector);
-        token.mint(address(token), mintAmount);
+        vm.expectRevert(InflationToken.CannotMintToBlockedAddress.selector);
+        token.mint(address(token));
     }
 
     function testRecoverTokens() public {
         vm.warp(block.timestamp + 365 days);
-        uint256 mintAmount = (token.totalSupply() * 1) / 100;
-        token.mint(owner, mintAmount);
-        token.transfer(address(token), mintAmount);
+        token.mint(owner);
+        token.transfer(address(token), token.MINT_CAP());
 
         uint256 contractBalanceBefore = token.balanceOf(address(token));
         console.log("Contract balance before recovery:", contractBalanceBefore);
         uint256 ownerBalanceBefore = token.balanceOf(owner);
         console.log("Owner balance before recovery:", ownerBalanceBefore);
 
-        token.recoverTokens(address(token), mintAmount, owner);
+        token.recoverTokens(address(token), token.MINT_CAP(), owner);
 
         uint256 contractBalanceAfter = token.balanceOf(address(token));
         uint256 ownerBalanceAfter = token.balanceOf(owner);
         console.log("Contract balance after recovery:", contractBalanceAfter);
         console.log("Owner balance after recovery:", ownerBalanceAfter);
 
-        assertEq(contractBalanceAfter, contractBalanceBefore - mintAmount);
-        assertEq(ownerBalanceAfter, ownerBalanceBefore + mintAmount);
+        assertEq(contractBalanceAfter, contractBalanceBefore - token.MINT_CAP());
+        assertEq(ownerBalanceAfter, ownerBalanceBefore + token.MINT_CAP());
     }
 
     function testTotalSupplyAfterInflation() public {
         console.log("Testing Total Supply After Inflation for 5 years");
-        console.log("Inflation is a constant 5% of the initial supply on launch");
+        console.log("Inflation is a constant 5% of the initial supply each year");
         uint256 initialSupply = 1_000_000_000 * 10 ** token.decimals();
-        uint256 mintAmount = (initialSupply * 5) / 100; // Flat 5% of the initial supply each year
 
         for (uint256 year = 1; year <= 5; year++) {
             vm.warp(block.timestamp + 365 days);
-            token.mint(owner, mintAmount);
-            uint256 expectedSupply = initialSupply + (mintAmount * year);
-            console.log("Year", year, "- Minted amount:", mintAmount);
+            token.mint(owner);
+            uint256 expectedSupply = initialSupply + (token.MINT_CAP() * year);
+            console.log("Year", year, "- Minted amount:", token.MINT_CAP());
             console.log("Year", year, "- Expected Total Supply:", expectedSupply);
             console.log("Year", year, "- Actual Total Supply:", token.totalSupply());
             assertEq(token.totalSupply(), expectedSupply);
         }
     }
 
-    function testPauseAndUnpause() public {
-        console.log("Testing Pause and Unpause");
-        token.pause();
-        console.log("Contract paused");
-
-        // Expect revert with EnforcedPause error
-        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
-        token.transfer(user, 1);
-
-        token.unpause();
-        console.log("Contract unpaused");
-        token.transfer(user, 1);
-        console.log("Transferred 1 token to user");
-        assertEq(token.balanceOf(user), 1);
-    }
-
-    function testPauseAndUnpauseByNonOwner() public {
-        vm.prank(user);
-        console.log("Attempting to pause contract as non-owner, expecting revert");
-
-        // Expect revert with OwnableUnauthorizedAccount error
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user));
-        token.pause();
-    }
-
-    function testDelegationAndVoting() public {
-        console.log("Testing Delegation and Voting");
-
-        // User delegates votes to themselves
-        vm.prank(user);
-        token.delegate(user);
-        console.log("User delegated votes to themselves");
-
-        // Get initial votes for user
-        uint256 initialVotes = token.getVotes(user);
-        console.log("Initial votes for user:", initialVotes);
-
-        // Transfer 100 tokens to the user
-        token.transfer(user, 100);
-        console.log("Transferred 100 tokens to user");
-
-        // User delegates votes to themselves again after transfer
-        vm.prank(user);
-        token.delegate(user);
-        console.log("User re-delegated votes to themselves");
-
-        // Calculate expected votes after transfer and re-delegation
-        uint256 expectedVotes = initialVotes + 100;
-        uint256 actualVotes = token.getVotes(user);
-        console.log("Expected votes for user after transfer and re-delegation:", expectedVotes);
-        console.log("Actual votes for user after transfer and re-delegation:", actualVotes);
-
-        assertEq(actualVotes, expectedVotes);
-
-        // User delegates votes to another user (user2)
-        vm.prank(user);
-        token.delegate(user2);
-        console.log("User delegated votes to user2");
-
-        // Check balance of user2 (should be zero tokens, but have delegated votes)
-        uint256 user2Votes = token.getVotes(user2);
-        console.log("Votes for user2 after delegation from user:", user2Votes);
-
-        uint256 user2ExpectedVotes = expectedVotes; // All votes should now be delegated to user2
-        console.log("Expected votes for user2 after delegation:", user2ExpectedVotes);
-        assertEq(user2Votes, user2ExpectedVotes);
-    }
-
     function testTransferOwnership() public {
         console.log("Testing Ownership Transfer");
-
-        // Transfer ownership to user
         token.transferOwnership(user);
         console.log("Ownership transferred to user");
-
-        // Prank as new owner and pause the contract
-        vm.prank(user);
-        token.pause();
-        console.log("Contract paused by new owner");
-
-        // Prank as old owner and expect revert when trying to unpause
-        vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", owner));
-        token.unpause();
     }
 
     function testTokenTransfers() public {
@@ -243,25 +146,6 @@ contract InflationTokenTest is Test {
         console.log("Burned 100 tokens");
         assertEq(token.totalSupply(), initialSupply - 100);
         console.log("Total supply after burning:", token.totalSupply());
-    }
-
-    function testMintingInThePastReverts() public {
-        console.log("Testing Minting in the Past Reverts");
-
-        // Warp to a future timestamp to simulate past minting allowed time
-        uint256 futureTime = block.timestamp + 365 days;
-        vm.warp(futureTime);
-
-        // Set minting allowed time to a past time
-        uint256 mintingAllowedAfter = block.timestamp - 1;
-
-        // Expect revert with MintAllowedAfterDeployOnly error
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                InflationToken.MintAllowedAfterDeployOnly.selector, block.timestamp, mintingAllowedAfter
-            )
-        );
-        new InflationToken(mintingAllowedAfter);
     }
 
     function testCannotReceiveEth() public {
