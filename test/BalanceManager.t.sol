@@ -183,8 +183,14 @@ contract BalanceManagerTest is Test {
         console.log("Increase user1 balance by:", increaseAmount);
 
         uint256 expectedBalance = initialAmount + increaseAmount;
-        assertEq(_balanceManager.balances(address(_user1), address(_mockTokenA)), expectedBalance, "Balance should be increased");
-        assertEq(_balanceManager.totalBalances(address(_mockTokenA)), expectedBalance, "Total balance should be updated");
+        assertEq(
+            _balanceManager.balances(address(_user1), address(_mockTokenA)),
+            expectedBalance,
+            "Balance should be increased"
+        );
+        assertEq(
+            _balanceManager.totalBalances(address(_mockTokenA)), expectedBalance, "Total balance should be updated"
+        );
         console.log("Expected user1 balance:", expectedBalance);
         console.log("Actual user1 balance:", _balanceManager.balances(address(_user1), address(_mockTokenA)));
 
@@ -203,8 +209,14 @@ contract BalanceManagerTest is Test {
         console.log("Reduce user1 balance by:", reduceAmount);
 
         uint256 expectedBalance = initialAmount - reduceAmount;
-        assertEq(_balanceManager.balances(address(_user1), address(_mockTokenA)), expectedBalance, "Balance should be reduced");
-        assertEq(_balanceManager.totalBalances(address(_mockTokenA)), expectedBalance, "Total balance should be updated");
+        assertEq(
+            _balanceManager.balances(address(_user1), address(_mockTokenA)),
+            expectedBalance,
+            "Balance should be reduced"
+        );
+        assertEq(
+            _balanceManager.totalBalances(address(_mockTokenA)), expectedBalance, "Total balance should be updated"
+        );
         console.log("Expected user1 balance:", expectedBalance);
         console.log("Actual user1 balance:", _balanceManager.balances(address(_user1), address(_mockTokenA)));
 
@@ -316,8 +328,12 @@ contract BalanceManagerTest is Test {
 
         vm.startPrank(_user1);
         _balanceManager.claimAll();
-        assertEq(_balanceManager.balances(address(_user1), address(_mockTokenA)), 0, "Balance for Token A should be claimed");
-        assertEq(_balanceManager.balances(address(_user1), address(_mockTokenC)), 0, "Balance for Token C should be claimed");
+        assertEq(
+            _balanceManager.balances(address(_user1), address(_mockTokenA)), 0, "Balance for Token A should be claimed"
+        );
+        assertEq(
+            _balanceManager.balances(address(_user1), address(_mockTokenC)), 0, "Balance for Token C should be claimed"
+        );
 
         uint256 finalTokenABalance = _mockTokenA.balanceOf(_user1);
         uint256 finalTokenCBalance = _mockTokenC.balanceOf(_user1);

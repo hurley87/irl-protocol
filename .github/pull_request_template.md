@@ -12,5 +12,4 @@
 
 - [ ] `forge fmt`
 - [ ] `forge test`
-- [ ] `forge build`
 - [ ] docs are up to date
