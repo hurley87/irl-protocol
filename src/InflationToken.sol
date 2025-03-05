@@ -4,10 +4,7 @@ pragma solidity ^0.8.20;
 import "openzeppelin-contracts/token/ERC20/ERC20.sol";
 import "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import "openzeppelin-contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import "openzeppelin-contracts/token/ERC20/extensions/ERC20Pausable.sol";
 import "openzeppelin-contracts/access/Ownable.sol";
-import "openzeppelin-contracts/token/ERC20/extensions/ERC20Permit.sol";
-import "openzeppelin-contracts/token/ERC20/extensions/ERC20Votes.sol";
 
 using SafeERC20 for IERC20;
 
@@ -19,7 +16,7 @@ using SafeERC20 for IERC20;
  *         period between mints. The 5% rate is applied to the initial supply,
  *         not the total supply.
  */
-contract InflationToken is ERC20, ERC20Burnable, ERC20Pausable, ERC20Permit, ERC20Votes, Ownable {
+contract InflationToken is ERC20, ERC20Burnable, Ownable {
     string public constant TOKEN_NAME = "InflationToken";
     string public constant TOKEN_SYMBOL = "INFLA";
     uint256 public constant TOKEN_INITIAL_SUPPLY = 1_000_000_000;
@@ -33,7 +30,7 @@ contract InflationToken is ERC20, ERC20Burnable, ERC20Pausable, ERC20Permit, ERC
     error MintToContractAddressBlocked();
     error MintCapExceeded();
 
-    constructor() ERC20(TOKEN_NAME, TOKEN_SYMBOL) ERC20Permit(TOKEN_NAME) Ownable(msg.sender) {
+    constructor() ERC20(TOKEN_NAME, TOKEN_SYMBOL) Ownable() {
         _mint(msg.sender, TOKEN_INITIAL_SUPPLY * 10 ** decimals());
         mintingAllowedAfter = block.timestamp + MINIMUM_TIME_BETWEEN_MINTS;
     }
@@ -74,28 +71,5 @@ contract InflationToken is ERC20, ERC20Burnable, ERC20Pausable, ERC20Permit, ERC
      */
     function recoverTokens(address token, uint256 amount, address to) external onlyOwner {
         IERC20(token).safeTransfer(to, amount);
-    }
-
-    /**
-     * @dev pause all token transfers
-     */
-    function pause() public onlyOwner {
-        _pause();
-    }
-
-    /**
-     * @dev unpause all token transfers
-     */
-    function unpause() public onlyOwner {
-        _unpause();
-    }
-
-    // the following functions are overrides required by Solidity.
-    function _update(address from, address to, uint256 value) internal override(ERC20, ERC20Pausable, ERC20Votes) {
-        super._update(from, to, value);
-    }
-
-    function nonces(address owner) public view override(ERC20Permit, Nonces) returns (uint256) {
-        return super.nonces(owner);
     }
 }
