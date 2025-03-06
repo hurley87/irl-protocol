@@ -64,12 +64,12 @@ LazerForge comes pre-configured with VSCode settings:
 ## Project Structure
 
 ```bash
-├── src/                               # example contracts
-│   └── utils/                       # utility contracts
-├── test/                              # test files
-├── script/                           # example scripts
-├── .github/                        # GitHub Actions workflows
-├── lazerTutorial/               # LazerForge tutorial
+├── src/                        # example contracts
+│   └── utils/                  # utility contracts
+├── test/                       # test files
+├── script/                     # example scripts
+├── .github/                    # GitHub Actions workflows
+├── lazerTutorial/              # LazerForge tutorial
 └── foundry.toml                # foundry config
 ```
 
