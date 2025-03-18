@@ -22,7 +22,13 @@ foundryup
 2. Create a new LazerForge project:
 
 ```bash
-forge init --template lazertechnologies/lazerforge
+forge init --template lazertechnologies/lazerforge <project_name>
+```
+
+To create a project with only config files and no tutorial contracts:
+
+```bash
+forge init --template lazertechnologies/lazerforge --branch minimal <project_name>
 ```
 
 3. Install dependencies:
