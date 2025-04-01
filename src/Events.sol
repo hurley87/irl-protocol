@@ -154,15 +154,13 @@ contract Events is Ownable, Pausable {
         EventInfo storage evt = events[eventId];
         require(evt.exists, "Event doesn't exist");
         require(newStartTime < newEndTime, "Invalid time range");
-        require(block.timestamp < evt.startTime || newStartTime > block.timestamp, "Cannot modify started event");
+        require(block.timestamp < evt.startTime, "Cannot modify started event");
         
-        uint256 oldStartTime = evt.startTime;
-        uint256 oldEndTime = evt.endTime;
+        emit EventTimesUpdated(eventId, evt.startTime, evt.endTime, newStartTime, newEndTime);
         
         evt.startTime = newStartTime;
         evt.endTime = newEndTime;
         
-        emit EventTimesUpdated(eventId, oldStartTime, oldEndTime, newStartTime, newEndTime);
         emit EventUpdated(eventId, newStartTime, newEndTime, evt.maxCapacity);
     }
 

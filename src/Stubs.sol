@@ -12,7 +12,7 @@ contract Stubs is ERC1155, Ownable {
         _;
     }
 
-    constructor(string memory uri) ERC1155(uri) Ownable(msg.sender) {}
+    constructor(string memory uri) ERC1155(uri) Ownable() {}
 
     function setEventsContract(address _eventsContract) external onlyOwner {
         eventsContract = _eventsContract;
