@@ -66,8 +66,15 @@ contract EventsTest is Test {
     function testCreateEvent() public {
         _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
 
-        (uint256 stubId, uint256 points, uint256 startTime, uint256 endTime, uint256 maxCapacity, uint256 totalCheckedIn, bool exists) = 
-            _events.getEventDetails(_eventId);
+        (
+            uint256 stubId,
+            uint256 points,
+            uint256 startTime,
+            uint256 endTime,
+            uint256 maxCapacity,
+            uint256 totalCheckedIn,
+            bool exists
+        ) = _events.getEventDetails(_eventId);
 
         assertEq(stubId, _stubId, "Stub ID should match");
         assertEq(points, _pointsAmount, "Points should match");
@@ -200,8 +207,7 @@ contract EventsTest is Test {
 
         _events.updateEventTimes(_eventId, newStartTime, newEndTime);
 
-        (,, uint256 startTime, uint256 endTime,,, ) = 
-            _events.getEventDetails(_eventId);
+        (,, uint256 startTime, uint256 endTime,,,) = _events.getEventDetails(_eventId);
 
         assertEq(startTime, newStartTime, "Start time should be updated");
         assertEq(endTime, newEndTime, "End time should be updated");
@@ -226,8 +232,7 @@ contract EventsTest is Test {
         uint256 newCapacity = _maxCapacity + 5;
         _events.updateEventCapacity(_eventId, newCapacity);
 
-        (,,,, uint256 maxCapacity,, ) = 
-            _events.getEventDetails(_eventId);
+        (,,,, uint256 maxCapacity,,) = _events.getEventDetails(_eventId);
 
         assertEq(maxCapacity, newCapacity, "Capacity should be updated");
     }
@@ -254,8 +259,7 @@ contract EventsTest is Test {
         uint256 newPoints = _pointsAmount + 50;
         _events.updateEventPoints(_eventId, newPoints);
 
-        (, uint256 points,,,,, ) = 
-            _events.getEventDetails(_eventId);
+        (, uint256 points,,,,,) = _events.getEventDetails(_eventId);
 
         assertEq(points, newPoints, "Points should be updated");
     }
@@ -277,8 +281,7 @@ contract EventsTest is Test {
         uint256 newStubId = _stubId + 1;
         _events.updateEventStub(_eventId, newStubId);
 
-        (uint256 stubId,,,,,, ) = 
-            _events.getEventDetails(_eventId);
+        (uint256 stubId,,,,,,) = _events.getEventDetails(_eventId);
 
         assertEq(stubId, newStubId, "Stub ID should be updated");
     }
@@ -330,7 +333,7 @@ contract EventsTest is Test {
         _events.autoEndEvent(_eventId);
         // Advance time by 1 second to ensure hasEnded is true
         vm.warp(block.timestamp + 1);
-        
+
         (,,, bool hasEnded,) = _events.getEventStatus(_eventId);
         assertTrue(hasEnded, "Event should be ended");
 

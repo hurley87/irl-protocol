@@ -47,10 +47,14 @@ contract Events is Ownable, Pausable {
     event EventUnpaused(uint256 indexed eventId);
     event EventDeleted(uint256 indexed eventId);
     event BulkAllowlistUpdated(uint256 indexed eventId, uint256 count);
-    event EventCreated(uint256 indexed eventId, uint256 stubId, uint256 points, uint256 startTime, uint256 endTime, uint256 maxCapacity);
+    event EventCreated(
+        uint256 indexed eventId, uint256 stubId, uint256 points, uint256 startTime, uint256 endTime, uint256 maxCapacity
+    );
     event AllowlistUpdated(uint256 indexed eventId, address indexed user, bool allowed);
     event EventCapacityUpdated(uint256 indexed eventId, uint256 oldCapacity, uint256 newCapacity);
-    event EventTimesUpdated(uint256 indexed eventId, uint256 oldStartTime, uint256 oldEndTime, uint256 newStartTime, uint256 newEndTime);
+    event EventTimesUpdated(
+        uint256 indexed eventId, uint256 oldStartTime, uint256 oldEndTime, uint256 newStartTime, uint256 newEndTime
+    );
 
     /// @notice Initializes the contract with required dependencies
     /// @param _eventStub Address of the Stubs contract for NFT minting
@@ -99,7 +103,11 @@ contract Events is Ownable, Pausable {
     /// @param attendees Array of attendee addresses
     /// @param allowed Whether to allow or disallow the attendees
     /// @dev Only callable by contract owner
-    function setAllowlist(uint256 eventId, address[] calldata attendees, bool allowed) external onlyOwner whenNotPaused {
+    function setAllowlist(uint256 eventId, address[] calldata attendees, bool allowed)
+        external
+        onlyOwner
+        whenNotPaused
+    {
         require(events[eventId].exists, "Event doesn't exist");
         for (uint256 i = 0; i < attendees.length; i++) {
             allowlist[eventId][attendees[i]] = allowed;
@@ -136,7 +144,7 @@ contract Events is Ownable, Pausable {
         EventInfo storage evt = events[eventId];
         require(evt.exists, "Event doesn't exist");
         require(block.timestamp <= evt.endTime, "Event already ended");
-        
+
         evt.endTime = block.timestamp;
         emit EventEnded(eventId);
     }
@@ -146,21 +154,21 @@ contract Events is Ownable, Pausable {
     /// @param newStartTime New start time (Unix timestamp)
     /// @param newEndTime New end time (Unix timestamp)
     /// @dev Only callable by contract owner. Cannot modify started events.
-    function updateEventTimes(
-        uint256 eventId,
-        uint256 newStartTime,
-        uint256 newEndTime
-    ) external onlyOwner whenNotPaused {
+    function updateEventTimes(uint256 eventId, uint256 newStartTime, uint256 newEndTime)
+        external
+        onlyOwner
+        whenNotPaused
+    {
         EventInfo storage evt = events[eventId];
         require(evt.exists, "Event doesn't exist");
         require(newStartTime < newEndTime, "Invalid time range");
         require(block.timestamp < evt.startTime, "Cannot modify started event");
-        
+
         emit EventTimesUpdated(eventId, evt.startTime, evt.endTime, newStartTime, newEndTime);
-        
+
         evt.startTime = newStartTime;
         evt.endTime = newEndTime;
-        
+
         emit EventUpdated(eventId, newStartTime, newEndTime, evt.maxCapacity);
     }
 
@@ -172,10 +180,10 @@ contract Events is Ownable, Pausable {
         EventInfo storage evt = events[eventId];
         require(evt.exists, "Event doesn't exist");
         require(newMaxCapacity >= evt.totalCheckedIn, "New capacity must be >= current check-ins");
-        
+
         uint256 oldCapacity = evt.maxCapacity;
         evt.maxCapacity = newMaxCapacity;
-        
+
         emit EventCapacityUpdated(eventId, oldCapacity, newMaxCapacity);
         emit EventUpdated(eventId, evt.startTime, evt.endTime, newMaxCapacity);
     }
@@ -188,7 +196,7 @@ contract Events is Ownable, Pausable {
         EventInfo storage evt = events[eventId];
         require(evt.exists, "Event doesn't exist");
         require(block.timestamp < evt.startTime, "Cannot modify started event");
-        
+
         evt.points = newPoints;
         emit EventPointsUpdated(eventId, newPoints);
     }
@@ -201,7 +209,7 @@ contract Events is Ownable, Pausable {
         EventInfo storage evt = events[eventId];
         require(evt.exists, "Event doesn't exist");
         require(block.timestamp < evt.startTime, "Cannot modify started event");
-        
+
         evt.stubId = newStubId;
         emit EventStubUpdated(eventId, newStubId);
     }
@@ -215,25 +223,21 @@ contract Events is Ownable, Pausable {
     /// @return maxCapacity Maximum allowed attendees
     /// @return totalCheckedIn Current number of check-ins
     /// @return exists Whether the event exists
-    function getEventDetails(uint256 eventId) external view returns (
-        uint256 stubId,
-        uint256 points,
-        uint256 startTime,
-        uint256 endTime,
-        uint256 maxCapacity,
-        uint256 totalCheckedIn,
-        bool exists
-    ) {
+    function getEventDetails(uint256 eventId)
+        external
+        view
+        returns (
+            uint256 stubId,
+            uint256 points,
+            uint256 startTime,
+            uint256 endTime,
+            uint256 maxCapacity,
+            uint256 totalCheckedIn,
+            bool exists
+        )
+    {
         EventInfo storage evt = events[eventId];
-        return (
-            evt.stubId,
-            evt.points,
-            evt.startTime,
-            evt.endTime,
-            evt.maxCapacity,
-            evt.totalCheckedIn,
-            evt.exists
-        );
+        return (evt.stubId, evt.points, evt.startTime, evt.endTime, evt.maxCapacity, evt.totalCheckedIn, evt.exists);
     }
 
     /// @notice Pauses an event, preventing check-ins
@@ -243,7 +247,7 @@ contract Events is Ownable, Pausable {
         EventInfo storage evt = events[eventId];
         require(evt.exists, "Event doesn't exist");
         require(!evt.paused, "Event already paused");
-        
+
         evt.paused = true;
         emit EventPaused(eventId);
     }
@@ -255,7 +259,7 @@ contract Events is Ownable, Pausable {
         EventInfo storage evt = events[eventId];
         require(evt.exists, "Event doesn't exist");
         require(evt.paused, "Event not paused");
-        
+
         evt.paused = false;
         emit EventUnpaused(eventId);
     }
@@ -293,7 +297,7 @@ contract Events is Ownable, Pausable {
         EventInfo storage evt = events[eventId];
         require(evt.exists, "Event doesn't exist");
         require(evt.totalCheckedIn == 0, "Cannot delete event with check-ins");
-        
+
         delete events[eventId];
         emit EventDeleted(eventId);
     }
@@ -303,11 +307,8 @@ contract Events is Ownable, Pausable {
     /// @return bool Whether the event is active
     function isEventActive(uint256 eventId) external view returns (bool) {
         EventInfo storage evt = events[eventId];
-        return evt.exists && 
-               !evt.paused && 
-               block.timestamp >= evt.startTime && 
-               block.timestamp <= evt.endTime && 
-               evt.totalCheckedIn < evt.maxCapacity;
+        return evt.exists && !evt.paused && block.timestamp >= evt.startTime && block.timestamp <= evt.endTime
+            && evt.totalCheckedIn < evt.maxCapacity;
     }
 
     /// @notice Gets comprehensive status information about an event
@@ -317,13 +318,11 @@ contract Events is Ownable, Pausable {
     /// @return hasStarted Whether the event has started
     /// @return hasEnded Whether the event has ended
     /// @return isAtCapacity Whether the event is at capacity
-    function getEventStatus(uint256 eventId) external view returns (
-        bool exists,
-        bool paused,
-        bool hasStarted,
-        bool hasEnded,
-        bool isAtCapacity
-    ) {
+    function getEventStatus(uint256 eventId)
+        external
+        view
+        returns (bool exists, bool paused, bool hasStarted, bool hasEnded, bool isAtCapacity)
+    {
         EventInfo storage evt = events[eventId];
         return (
             evt.exists,
