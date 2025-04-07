@@ -45,25 +45,28 @@ contract UserManager is Ownable {
     function _isValidUsername(string memory name) internal pure returns (bool) {
         bytes memory b = bytes(name);
         if (b.length < MIN_USERNAME_LENGTH || b.length > MAX_USERNAME_LENGTH) return false;
-        
+
         // Cannot start or end with hyphen
         if (b[0] == "-" || b[b.length - 1] == "-") return false;
-        
+
         // Check each character
         for (uint256 i = 0; i < b.length; i++) {
             bytes1 char = b[i];
-            
+
             // Check for consecutive hyphens
             if (char == "-" && i > 0 && b[i - 1] == "-") return false;
-            
+
             // Check if character is valid
-            if (!(char >= 0x61 && char <= 0x7A) && // a-z
-                !(char >= 0x30 && char <= 0x39) && // 0-9
-                !(char == 0x2D)) { // hyphen
+            if (
+                !(char >= 0x61 && char <= 0x7A) // a-z
+                    && !(char >= 0x30 && char <= 0x39) // 0-9
+                    && !(char == 0x2D)
+            ) {
+                // hyphen
                 return false;
             }
         }
-        
+
         return true;
     }
 
@@ -79,12 +82,8 @@ contract UserManager is Ownable {
         address[] memory initialAddresses = new address[](1);
         initialAddresses[0] = msg.sender;
 
-        UserInfo memory newUser = UserInfo({
-            userId: newUserId,
-            username: name,
-            primaryAddress: 0,
-            addresses: initialAddresses
-        });
+        UserInfo memory newUser =
+            UserInfo({userId: newUserId, username: name, primaryAddress: 0, addresses: initialAddresses});
 
         userIdMapping[newUserId] = newUser;
         usernameToId[name] = newUserId;
@@ -109,14 +108,14 @@ contract UserManager is Ownable {
         require(userIdMapping[userId].userId != 0, "User does not exist");
         require(_isValidUsername(name), "Invalid username format");
         require(usernameToId[name] == 0, "Username already taken");
-        
+
         // Only allow the user's primary address to update the name
         UserInfo storage user = userIdMapping[userId];
         require(msg.sender == user.addresses[user.primaryAddress], "Only primary address can update username");
 
         string memory oldUsername = user.username;
         delete usernameToId[oldUsername];
-        
+
         user.username = name;
         usernameToId[name] = userId;
 
@@ -129,7 +128,7 @@ contract UserManager is Ownable {
     function addAddress(uint256 userId, address newAddress) external {
         require(userIdMapping[userId].userId != 0, "User does not exist");
         require(addressToId[newAddress] == 0, "Address already registered");
-        
+
         // Only allow the user's primary address to add new addresses
         UserInfo storage user = userIdMapping[userId];
         require(msg.sender == user.addresses[user.primaryAddress], "Only primary address can add new addresses");
@@ -145,10 +144,12 @@ contract UserManager is Ownable {
     /// @param newPrimaryIndex The index of the new primary address in the addresses array
     function updatePrimaryAddress(uint256 userId, uint256 newPrimaryIndex) external {
         require(userIdMapping[userId].userId != 0, "User does not exist");
-        
+
         UserInfo storage user = userIdMapping[userId];
         require(newPrimaryIndex < user.addresses.length, "Invalid address index");
-        require(msg.sender == user.addresses[user.primaryAddress], "Only current primary address can update primary address");
+        require(
+            msg.sender == user.addresses[user.primaryAddress], "Only current primary address can update primary address"
+        );
 
         address oldPrimary = user.addresses[user.primaryAddress];
         user.primaryAddress = newPrimaryIndex;
@@ -171,4 +172,4 @@ contract UserManager is Ownable {
         require(userIdMapping[userId].userId != 0, "User does not exist");
         return userIdMapping[userId].addresses;
     }
-} 
+}
