@@ -3,15 +3,51 @@ pragma solidity ^0.8.20;
 
 import "openzeppelin-contracts/access/Ownable.sol";
 import "openzeppelin-contracts/security/Pausable.sol";
+import "openzeppelin-contracts/proxy/utils/UUPSUpgradeable.sol";
+import "openzeppelin-contracts/proxy/utils/Initializable.sol";
 import "./Stubs.sol";
 import "./Points.sol";
 
 /// @title Events Contract
 /// @notice Manages event creation, check-ins, and rewards distribution
 /// @dev Handles event lifecycle, allowlist management, and points/stub distribution
-contract Events is Ownable, Pausable {
+contract Events is Ownable, Pausable, UUPSUpgradeable, Initializable {
     Stubs public eventStub;
     Points public eventPoints;
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @notice Initializes the contract with required dependencies
+    /// @param _eventStub Address of the Stubs contract for NFT minting
+    /// @param _eventPoints Address of the Points contract for points distribution
+    function initialize(address _eventStub, address _eventPoints) public initializer {
+        __Ownable_init();
+        __Pausable_init();
+        eventStub = Stubs(_eventStub);
+        eventPoints = Points(_eventPoints);
+    }
+
+    /// @notice Authorizes an upgrade to a new implementation
+    /// @param newImplementation Address of the new implementation
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /// @notice Upgrades the implementation of the proxy to a new implementation
+    /// @param newImplementation Address of the new implementation
+    /// @dev Only callable by the owner. The new implementation must be UUPS-compliant.
+    function upgradeTo(address newImplementation) external override onlyOwner {
+        _upgradeToAndCallUUPS(newImplementation, new bytes(0), false);
+    }
+
+    /// @notice Upgrades the implementation of the proxy to a new implementation and calls a function
+    /// @param newImplementation Address of the new implementation
+    /// @param data Data to be sent to the new implementation
+    /// @dev Only callable by the owner. The new implementation must be UUPS-compliant.
+    function upgradeToAndCall(address newImplementation, bytes memory data) external payable override onlyOwner {
+        _upgradeToAndCallUUPS(newImplementation, data, true);
+    }
 
     /// @notice Structure containing all information about an event
     /// @param stubId The ID of the stub NFT to be minted on check-in
@@ -55,14 +91,6 @@ contract Events is Ownable, Pausable {
     event EventTimesUpdated(
         uint256 indexed eventId, uint256 oldStartTime, uint256 oldEndTime, uint256 newStartTime, uint256 newEndTime
     );
-
-    /// @notice Initializes the contract with required dependencies
-    /// @param _eventStub Address of the Stubs contract for NFT minting
-    /// @param _eventPoints Address of the Points contract for points distribution
-    constructor(address _eventStub, address _eventPoints) Ownable() {
-        eventStub = Stubs(_eventStub);
-        eventPoints = Points(_eventPoints);
-    }
 
     /// @notice Pauses the entire contract
     /// @dev Only callable by contract owner
