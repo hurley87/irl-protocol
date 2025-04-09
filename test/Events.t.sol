@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 import "../src/Events.sol";
+import "../src/EventsProxy.sol";
 import "../src/Stubs.sol";
 import "../src/Points.sol";
 
@@ -13,6 +14,7 @@ import "../src/Points.sol";
  */
 contract EventsTest is Test {
     Events _events;
+    EventsProxy _proxy;
     Stubs _stubs;
     Points _points;
     address _owner;
@@ -37,8 +39,15 @@ contract EventsTest is Test {
         _stubs = new Stubs("https://example.com/");
         _points = new Points();
 
-        // Deploy Events contract with this contract as owner
-        _events = new Events(address(_stubs), address(_points));
+        // Deploy Events implementation
+        _events = new Events();
+
+        // Deploy proxy and initialize it
+        bytes memory initData = abi.encodeWithSelector(Events.initialize.selector, address(_stubs), address(_points));
+        _proxy = new EventsProxy(address(_events), initData);
+
+        // Cast proxy to Events interface
+        _events = Events(address(_proxy));
 
         // Transfer ownership of Points and Stubs to Events contract
         _points.transferOwnership(address(_events));
@@ -60,7 +69,8 @@ contract EventsTest is Test {
         console.log("User3 address:", _user3);
         console.log("Stubs contract:", address(_stubs));
         console.log("Points contract:", address(_points));
-        console.log("Events contract:", address(_events));
+        console.log("Events implementation:", address(_events));
+        console.log("Events proxy:", address(_proxy));
     }
 
     function testCreateEvent() public {

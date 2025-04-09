@@ -3,12 +3,13 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
 import "../src/Events.sol";
+import "../src/EventsProxy.sol";
 import "../src/Stubs.sol";
 import "../src/Points.sol";
 
 /**
  * @title DeployScript
- * @notice This script deploys Events. Simulate running it by entering
+ * @notice This script deploys Events using the UUPS proxy pattern. Simulate running it by entering
  *         `forge script script/Deploy.s.sol --sender <the_caller_address>
  *         --fork-url $GOERLI_RPC_URL -vvvv` in the terminal. To run it for
  *         real, change it to `forge script script/Deploy.s.sol
@@ -17,7 +18,33 @@ import "../src/Points.sol";
 contract DeployScript is Script {
     function run() public {
         vm.broadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
-        Events events = new Events(address(0), address(0));
-        console.log("Events deployed at:", address(events));
+
+        // Deploy dependencies
+        Stubs stubs = new Stubs("https://example.com/");
+        Points points = new Points();
+
+        // Deploy Events implementation
+        Events eventsImpl = new Events();
+
+        // Deploy proxy and initialize it
+        bytes memory initData = abi.encodeWithSelector(Events.initialize.selector, address(stubs), address(points));
+        EventsProxy proxy = new EventsProxy(address(eventsImpl), initData);
+
+        // Cast proxy to Events interface
+        Events events = Events(address(proxy));
+
+        // Transfer ownership of Points and Stubs to Events contract
+        points.transferOwnership(address(events));
+        stubs.transferOwnership(address(events));
+
+        // Set Events contract in Stubs
+        vm.startPrank(address(events));
+        stubs.setEventsContract(address(events));
+        vm.stopPrank();
+
+        console.log("Stubs deployed at:", address(stubs));
+        console.log("Points deployed at:", address(points));
+        console.log("Events implementation deployed at:", address(eventsImpl));
+        console.log("Events proxy deployed at:", address(proxy));
     }
 }
