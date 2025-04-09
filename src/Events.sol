@@ -26,6 +26,7 @@ contract Events is Ownable2Step, Pausable, UUPSUpgradeable, Initializable {
     function initialize(address _eventStub, address _eventPoints) public initializer {
         eventStub = Stubs(_eventStub);
         eventPoints = Points(_eventPoints);
+        _transferOwnership(msg.sender);
     }
 
     /// @notice Authorizes an upgrade to a new implementation
