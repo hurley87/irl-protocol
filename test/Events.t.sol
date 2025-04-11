@@ -42,20 +42,15 @@ contract EventsTest is Test {
 
         // Deploy and initialize Stubs
         Stubs stubsImpl = new Stubs();
-        bytes memory stubsInitData = abi.encodeWithSelector(
-            Stubs.initialize.selector,
-            "https://example.com/api/token/{id}.json"
-        );
+        bytes memory stubsInitData =
+            abi.encodeWithSelector(Stubs.initialize.selector, "https://example.com/api/token/{id}.json");
         ERC1967Proxy stubsProxy = new ERC1967Proxy(address(stubsImpl), stubsInitData);
         _stubs = Stubs(address(stubsProxy));
 
         // Deploy Events implementation and create proxy
         Events eventsImpl = new Events();
-        bytes memory eventsInitData = abi.encodeWithSelector(
-            Events.initialize.selector,
-            address(_stubs),
-            address(_points)
-        );
+        bytes memory eventsInitData =
+            abi.encodeWithSelector(Events.initialize.selector, address(_stubs), address(_points));
         ERC1967Proxy eventsProxy = new ERC1967Proxy(address(eventsImpl), eventsInitData);
         _events = Events(address(eventsProxy));
 
