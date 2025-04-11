@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "openzeppelin-contracts/access/Ownable.sol";
+import "@openzeppelin-contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
 
 /// @title UserManager Contract
 /// @notice Manages user profiles and their associated addresses
 /// @dev Handles user creation, name management, and address tracking
-contract UserManager is Ownable {
+contract UserManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /// @notice Structure containing user profile information
     /// @param userId Unique identifier for the user
     /// @param username Display name of the user
@@ -35,9 +37,18 @@ contract UserManager is Ownable {
     event AddressAdded(uint256 indexed userId, address newAddress);
     event PrimaryAddressUpdated(uint256 indexed userId, address oldPrimary, address newPrimary);
 
-    constructor() Ownable() {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize() public initializer {
+        __Ownable2Step_init();
+        _transferOwnership(msg.sender);
         _userIdCounter = 1; // Start user IDs from 1
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /// @notice Validates a username according to ENS-like rules
     /// @param name The username to validate
@@ -172,4 +183,11 @@ contract UserManager is Ownable {
         require(userIdMapping[userId].userId != 0, "User does not exist");
         return userIdMapping[userId].addresses;
     }
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[47] private __gap;
 }

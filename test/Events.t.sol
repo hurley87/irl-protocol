@@ -3,9 +3,9 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 import "../src/Events.sol";
-import "../src/EventsProxy.sol";
 import "../src/Stubs.sol";
 import "../src/Points.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
  * @title Events Test
@@ -14,7 +14,6 @@ import "../src/Points.sol";
  */
 contract EventsTest is Test {
     Events _events;
-    EventsProxy _proxy;
     Stubs _stubs;
     Points _points;
     address _owner;
@@ -36,31 +35,40 @@ contract EventsTest is Test {
         _user3 = vm.addr(3);
 
         // Deploy dependencies first
-        _stubs = new Stubs("https://example.com/");
+        _stubs = new Stubs();
         _points = new Points();
 
+        // Initialize dependencies
+        _stubs.initialize("https://example.com/api/token/{id}.json");
+        _points.initialize();
+
         // Deploy Events implementation
-        _events = new Events();
+        Events eventsImpl = new Events();
 
-        // Deploy proxy and initialize it
+        // Create and initialize Events proxy
         bytes memory initData = abi.encodeWithSelector(Events.initialize.selector, address(_stubs), address(_points));
-        _proxy = new EventsProxy(address(_events), initData);
-
-        // Cast proxy to Events interface
-        _events = Events(address(_proxy));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(eventsImpl), initData);
+        _events = Events(address(proxy));
 
         // Transfer ownership of Points and Stubs to Events contract
+        vm.startPrank(_owner);
         _points.transferOwnership(address(_events));
         _stubs.transferOwnership(address(_events));
+        vm.stopPrank();
+
+        // Set Events contract in Stubs
+        vm.startPrank(address(_events));
+        _stubs.setEventsContract(address(_events));
+        vm.stopPrank();
+
+        // Transfer ownership of Events to test contract
+        vm.startPrank(address(_events));
+        _events.transferOwnership(_owner);
+        vm.stopPrank();
 
         // Set up event times
         _startTime = block.timestamp + 1 days;
         _endTime = _startTime + 1 days;
-
-        // Set Events contract in Stubs (this should work now since Events owns Stubs)
-        vm.startPrank(address(_events));
-        _stubs.setEventsContract(address(_events));
-        vm.stopPrank();
 
         // Log addresses
         console.log("Owner address:", _owner);
@@ -69,8 +77,8 @@ contract EventsTest is Test {
         console.log("User3 address:", _user3);
         console.log("Stubs contract:", address(_stubs));
         console.log("Points contract:", address(_points));
-        console.log("Events implementation:", address(_events));
-        console.log("Events proxy:", address(_proxy));
+        console.log("Events implementation:", address(eventsImpl));
+        console.log("Events proxy:", address(_events));
     }
 
     function testCreateEvent() public {

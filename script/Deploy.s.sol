@@ -3,9 +3,9 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
 import "../src/Events.sol";
-import "../src/EventsProxy.sol";
 import "../src/Stubs.sol";
 import "../src/Points.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
  * @title DeployScript
@@ -20,7 +20,7 @@ contract DeployScript is Script {
         vm.broadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
 
         // Deploy dependencies
-        Stubs stubs = new Stubs("https://example.com/");
+        Stubs stubs = new Stubs();
         Points points = new Points();
 
         // Deploy Events implementation
@@ -28,9 +28,7 @@ contract DeployScript is Script {
 
         // Deploy proxy and initialize it
         bytes memory initData = abi.encodeWithSelector(Events.initialize.selector, address(stubs), address(points));
-        EventsProxy proxy = new EventsProxy(address(eventsImpl), initData);
-
-        // Cast proxy to Events interface
+        ERC1967Proxy proxy = new ERC1967Proxy(address(eventsImpl), initData);
         Events events = Events(address(proxy));
 
         // Transfer ownership of Points and Stubs to Events contract
@@ -45,6 +43,6 @@ contract DeployScript is Script {
         console.log("Stubs deployed at:", address(stubs));
         console.log("Points deployed at:", address(points));
         console.log("Events implementation deployed at:", address(eventsImpl));
-        console.log("Events proxy deployed at:", address(proxy));
+        console.log("Events proxy deployed at:", address(events));
     }
 }

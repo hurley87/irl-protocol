@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../src/UserManager.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
  * @title UserManager Test
@@ -27,7 +28,11 @@ contract UserManagerTest is Test {
         user2 = vm.addr(2);
         user3 = vm.addr(3);
 
-        userManager = new UserManager();
+        // Deploy implementation and proxy
+        UserManager implementation = new UserManager();
+        bytes memory initData = abi.encodeWithSelector(UserManager.initialize.selector);
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
+        userManager = UserManager(address(proxy));
 
         // Log addresses
         console.log("Owner address:", owner);

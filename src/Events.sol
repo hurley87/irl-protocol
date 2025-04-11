@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "openzeppelin-contracts/access/Ownable2Step.sol";
-import "openzeppelin-contracts/security/Pausable.sol";
-import "openzeppelin-contracts/proxy/utils/UUPSUpgradeable.sol";
-import "openzeppelin-contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin-contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./Stubs.sol";
 import "./Points.sol";
 
 /// @title Events Contract
 /// @notice Manages event creation, check-ins, and rewards distribution
 /// @dev Handles event lifecycle, allowlist management, and points/stub distribution
-contract Events is Ownable2Step, Pausable, UUPSUpgradeable, Initializable {
+contract Events is Initializable, Ownable2StepUpgradeable, PausableUpgradeable, UUPSUpgradeable {
     Stubs public eventStub;
     Points public eventPoints;
 
@@ -24,6 +24,9 @@ contract Events is Ownable2Step, Pausable, UUPSUpgradeable, Initializable {
     /// @param _eventStub Address of the Stubs contract for NFT minting
     /// @param _eventPoints Address of the Points contract for points distribution
     function initialize(address _eventStub, address _eventPoints) public initializer {
+        __Ownable2Step_init();
+        __Pausable_init();
+        __UUPSUpgradeable_init();
         eventStub = Stubs(_eventStub);
         eventPoints = Points(_eventPoints);
         _transferOwnership(msg.sender);
