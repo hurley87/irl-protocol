@@ -24,9 +24,9 @@ contract Events is Initializable, Ownable2StepUpgradeable, PausableUpgradeable, 
     /// @param _eventStub Address of the Stubs contract for NFT minting
     /// @param _eventPoints Address of the Points contract for points distribution
     function initialize(address _eventStub, address _eventPoints) public initializer {
+        __UUPSUpgradeable_init();
         __Ownable2Step_init();
         __Pausable_init();
-        __UUPSUpgradeable_init();
         eventStub = Stubs(_eventStub);
         eventPoints = Points(_eventPoints);
         _transferOwnership(msg.sender);

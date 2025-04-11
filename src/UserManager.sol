@@ -43,6 +43,7 @@ contract UserManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
     }
 
     function initialize() public initializer {
+        __UUPSUpgradeable_init();
         __Ownable2Step_init();
         _transferOwnership(msg.sender);
         _userIdCounter = 1; // Start user IDs from 1

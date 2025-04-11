@@ -34,51 +34,52 @@ contract EventsTest is Test {
         _user2 = vm.addr(2);
         _user3 = vm.addr(3);
 
-        // Deploy dependencies first
-        _stubs = new Stubs();
-        _points = new Points();
+        // Deploy and initialize Points
+        Points pointsImpl = new Points();
+        bytes memory pointsInitData = abi.encodeWithSelector(Points.initialize.selector);
+        ERC1967Proxy pointsProxy = new ERC1967Proxy(address(pointsImpl), pointsInitData);
+        _points = Points(address(pointsProxy));
 
-        // Initialize dependencies
-        _stubs.initialize("https://example.com/api/token/{id}.json");
-        _points.initialize();
+        // Deploy and initialize Stubs
+        Stubs stubsImpl = new Stubs();
+        bytes memory stubsInitData = abi.encodeWithSelector(
+            Stubs.initialize.selector,
+            "https://example.com/api/token/{id}.json"
+        );
+        ERC1967Proxy stubsProxy = new ERC1967Proxy(address(stubsImpl), stubsInitData);
+        _stubs = Stubs(address(stubsProxy));
 
-        // Deploy Events implementation
+        // Deploy Events implementation and create proxy
         Events eventsImpl = new Events();
+        bytes memory eventsInitData = abi.encodeWithSelector(
+            Events.initialize.selector,
+            address(_stubs),
+            address(_points)
+        );
+        ERC1967Proxy eventsProxy = new ERC1967Proxy(address(eventsImpl), eventsInitData);
+        _events = Events(address(eventsProxy));
 
-        // Create and initialize Events proxy
-        bytes memory initData = abi.encodeWithSelector(Events.initialize.selector, address(_stubs), address(_points));
-        ERC1967Proxy proxy = new ERC1967Proxy(address(eventsImpl), initData);
-        _events = Events(address(proxy));
-
-        // Transfer ownership of Points and Stubs to Events contract
+        // Set up ownership and permissions
         vm.startPrank(_owner);
         _points.transferOwnership(address(_events));
         _stubs.transferOwnership(address(_events));
         vm.stopPrank();
 
-        // Set Events contract in Stubs
         vm.startPrank(address(_events));
+        _points.acceptOwnership();
+        _stubs.acceptOwnership();
         _stubs.setEventsContract(address(_events));
-        vm.stopPrank();
-
-        // Transfer ownership of Events to test contract
-        vm.startPrank(address(_events));
-        _events.transferOwnership(_owner);
         vm.stopPrank();
 
         // Set up event times
         _startTime = block.timestamp + 1 days;
         _endTime = _startTime + 1 days;
 
-        // Log addresses
+        // Log addresses for debugging
         console.log("Owner address:", _owner);
-        console.log("User1 address:", _user1);
-        console.log("User2 address:", _user2);
-        console.log("User3 address:", _user3);
-        console.log("Stubs contract:", address(_stubs));
-        console.log("Points contract:", address(_points));
-        console.log("Events implementation:", address(eventsImpl));
-        console.log("Events proxy:", address(_events));
+        console.log("Events address:", address(_events));
+        console.log("Stubs address:", address(_stubs));
+        console.log("Points address:", address(_points));
     }
 
     function testCreateEvent() public {

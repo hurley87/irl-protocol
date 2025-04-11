@@ -20,8 +20,9 @@ contract Stubs is Initializable, ERC1155Upgradeable, Ownable2StepUpgradeable, UU
     }
 
     function initialize(string memory uri) public initializer {
-        __ERC1155_init(uri);
         __Ownable2Step_init();
+        __ERC1155_init(uri);
+        __UUPSUpgradeable_init();
         _transferOwnership(msg.sender);
     }
 

@@ -13,6 +13,7 @@ contract Points is Initializable, ERC20Upgradeable, Ownable2StepUpgradeable, UUP
     }
 
     function initialize() public initializer {
+        __UUPSUpgradeable_init();
         __ERC20_init("Points", "PTS");
         __Ownable2Step_init();
         _transferOwnership(msg.sender);
