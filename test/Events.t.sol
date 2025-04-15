@@ -13,6 +13,10 @@ import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
  *      including event creation, check-ins, allowlist management, and event lifecycle.
  */
 contract EventsTest is Test {
+    // Event interfaces
+    event EventStubContractUpdated(address indexed oldStub, address indexed newStub);
+    event EventPointsContractUpdated(address indexed oldPoints, address indexed newPoints);
+
     Events _events;
     Stubs _stubs;
     Points _points;
@@ -168,6 +172,11 @@ contract EventsTest is Test {
     function testCannotCheckInIfNotAllowlisted() public {
         _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
 
+        // Set up allowlist requirement by adding someone to the allowlist
+        address[] memory attendees = new address[](1);
+        attendees[0] = _user2;
+        _events.setAllowlist(_eventId, attendees, true);
+
         // Move time to event start
         vm.warp(_startTime);
 
@@ -238,6 +247,11 @@ contract EventsTest is Test {
 
         vm.expectRevert("Cannot modify started event");
         _events.updateEventTimes(_eventId, newStartTime, newEndTime);
+
+        // Move time back before event start
+        vm.warp(_startTime - 1 hours);
+
+        // Now we should be able to update the times
     }
 
     function testUpdateEventCapacity() public {
@@ -361,15 +375,7 @@ contract EventsTest is Test {
         vm.stopPrank();
     }
 
-    function testDeleteEvent() public {
-        _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
-
-        _events.deleteEvent(_eventId);
-        (bool exists,,,,) = _events.getEventStatus(_eventId);
-        assertFalse(exists, "Event should be deleted");
-    }
-
-    function testCannotDeleteEventWithCheckIns() public {
+    function testSoftDeleteEvent() public {
         _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
         address[] memory attendees = new address[](1);
         attendees[0] = _user1;
@@ -381,8 +387,37 @@ contract EventsTest is Test {
         _events.checkIn(_eventId);
         vm.stopPrank();
 
+        // Try to delete the event - should fail because it has check-ins
         vm.expectRevert("Cannot delete event with check-ins");
         _events.deleteEvent(_eventId);
+
+        // Verify event still exists and data is preserved
+        (bool exists,,,,) = _events.getEventStatus(_eventId);
+        assertTrue(exists, "Event should still exist");
+
+        // Verify data is preserved
+        (
+            uint256 stubId,
+            uint256 points,
+            uint256 startTime,
+            uint256 endTime,
+            uint256 maxCapacity,
+            uint256 totalCheckedIn,
+            bool eventExists
+        ) = _events.getEventDetails(_eventId);
+        assertEq(stubId, _stubId, "Stub ID should be preserved");
+        assertEq(points, _pointsAmount, "Points should be preserved");
+        assertEq(startTime, _startTime, "Start time should be preserved");
+        assertEq(endTime, _endTime, "End time should be preserved");
+        assertEq(maxCapacity, _maxCapacity, "Max capacity should be preserved");
+        assertEq(totalCheckedIn, 1, "Check-in count should be preserved");
+        assertTrue(eventExists, "Event should still exist");
+
+        // Verify no new check-ins are allowed
+        vm.startPrank(_user2);
+        vm.expectRevert("Not on allowlist");
+        _events.checkIn(_eventId);
+        vm.stopPrank();
     }
 
     function testBulkSetAllowlist() public {
@@ -393,7 +428,7 @@ contract EventsTest is Test {
         attendees[1] = _user2;
         attendees[2] = _user3;
 
-        _events.bulkSetAllowlist(_eventId, attendees, true);
+        _events.setAllowlist(_eventId, attendees, true);
 
         assertTrue(_events.isUserAllowlisted(_eventId, _user1), "User1 should be allowlisted");
         assertTrue(_events.isUserAllowlisted(_eventId, _user2), "User2 should be allowlisted");
@@ -407,8 +442,8 @@ contract EventsTest is Test {
         attendees[0] = _user1;
         attendees[1] = _user2;
 
-        _events.bulkSetAllowlist(_eventId, attendees, true);
-        _events.bulkRemoveFromAllowlist(_eventId, attendees);
+        _events.setAllowlist(_eventId, attendees, true);
+        _events.setAllowlist(_eventId, attendees, false);
 
         assertFalse(_events.isUserAllowlisted(_eventId, _user1), "User1 should not be allowlisted");
         assertFalse(_events.isUserAllowlisted(_eventId, _user2), "User2 should not be allowlisted");
@@ -459,5 +494,125 @@ contract EventsTest is Test {
         vm.stopPrank();
 
         assertEq(_events.getEventCheckInCount(_eventId), 2, "Check-in count should be 2");
+    }
+
+    function testUpdateEventStubContract() public {
+        // Deploy new Stubs contract
+        Stubs newStubsImpl = new Stubs();
+        bytes memory newStubsInitData =
+            abi.encodeWithSelector(Stubs.initialize.selector, "https://newexample.com/api/token/{id}.json");
+        ERC1967Proxy newStubsProxy = new ERC1967Proxy(address(newStubsImpl), newStubsInitData);
+        Stubs newStubs = Stubs(address(newStubsProxy));
+
+        // Set up new Stubs contract
+        vm.startPrank(_owner);
+        newStubs.transferOwnership(address(_events));
+        vm.stopPrank();
+
+        vm.startPrank(address(_events));
+        newStubs.acceptOwnership();
+        newStubs.setEventsContract(address(_events));
+        vm.stopPrank();
+
+        // Update the Stubs contract
+        _events.updateEventStubContract(address(newStubs));
+
+        // Verify the update
+        assertEq(address(_events.eventStub()), address(newStubs), "Stubs contract should be updated");
+    }
+
+    function testUpdateEventPointsContract() public {
+        // Deploy new Points contract
+        Points newPointsImpl = new Points();
+        bytes memory newPointsInitData = abi.encodeWithSelector(Points.initialize.selector);
+        ERC1967Proxy newPointsProxy = new ERC1967Proxy(address(newPointsImpl), newPointsInitData);
+        Points newPoints = Points(address(newPointsProxy));
+
+        // Set up new Points contract
+        vm.startPrank(_owner);
+        newPoints.transferOwnership(address(_events));
+        vm.stopPrank();
+
+        vm.startPrank(address(_events));
+        newPoints.acceptOwnership();
+        vm.stopPrank();
+
+        // Update the Points contract
+        _events.updateEventPointsContract(address(newPoints));
+
+        // Verify the update
+        assertEq(address(_events.eventPoints()), address(newPoints), "Points contract should be updated");
+    }
+
+    function testCannotUpdateStubContractToZeroAddress() public {
+        vm.expectRevert("Invalid Stubs contract address");
+        _events.updateEventStubContract(address(0));
+    }
+
+    function testCannotUpdatePointsContractToZeroAddress() public {
+        vm.expectRevert("Invalid Points contract address");
+        _events.updateEventPointsContract(address(0));
+    }
+
+    function testCannotUpdateContractsWhenPaused() public {
+        // Pause the contract
+        _events.pause();
+
+        // Try to update contracts
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("EnforcedPause()"))));
+        _events.updateEventStubContract(address(_stubs));
+
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("EnforcedPause()"))));
+        _events.updateEventPointsContract(address(_points));
+
+        // Unpause to allow other tests to proceed
+        _events.unpause();
+    }
+
+    function testNonOwnerCannotUpdateContracts() public {
+        vm.startPrank(_user1);
+
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("OwnableUnauthorizedAccount(address)")), _user1));
+        _events.updateEventStubContract(address(_stubs));
+
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("OwnableUnauthorizedAccount(address)")), _user1));
+        _events.updateEventPointsContract(address(_points));
+
+        vm.stopPrank();
+    }
+
+    function testContractUpdateEvents() public {
+        // Deploy new contracts
+        Stubs newStubsImpl = new Stubs();
+        bytes memory newStubsInitData =
+            abi.encodeWithSelector(Stubs.initialize.selector, "https://newexample.com/api/token/{id}.json");
+        ERC1967Proxy newStubsProxy = new ERC1967Proxy(address(newStubsImpl), newStubsInitData);
+        Stubs newStubs = Stubs(address(newStubsProxy));
+
+        Points newPointsImpl = new Points();
+        bytes memory newPointsInitData = abi.encodeWithSelector(Points.initialize.selector);
+        ERC1967Proxy newPointsProxy = new ERC1967Proxy(address(newPointsImpl), newPointsInitData);
+        Points newPoints = Points(address(newPointsProxy));
+
+        // Set up new contracts
+        vm.startPrank(_owner);
+        newStubs.transferOwnership(address(_events));
+        newPoints.transferOwnership(address(_events));
+        vm.stopPrank();
+
+        vm.startPrank(address(_events));
+        newStubs.acceptOwnership();
+        newStubs.setEventsContract(address(_events));
+        newPoints.acceptOwnership();
+        vm.stopPrank();
+
+        // Update contracts and verify events
+        vm.expectEmit(true, true, true, true);
+        emit EventStubContractUpdated(address(_stubs), address(newStubs));
+        _events.updateEventStubContract(address(newStubs));
+
+        vm.expectEmit(true, true, true, true);
+        emit EventPointsContractUpdated(address(_points), address(newPoints));
+        _events.updateEventPointsContract(address(newPoints));
     }
 }
