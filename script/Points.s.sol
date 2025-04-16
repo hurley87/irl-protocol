@@ -14,7 +14,7 @@ import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
  *         --fork-url $GOERLI_RPC_URL -vvvv` in the terminal. To run it for
  *         real, change it to `forge script script/Deploy.s.sol
  *         --fork-url $GOERLI_RPC_URL --broadcast`.
- */ 
+ */
 contract PointsScript is Script {
     function run() public {
         vm.broadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));

@@ -33,7 +33,8 @@ contract DeployScript is Script {
 
         // Deploy Events implementation and proxy
         Events eventsImpl = new Events();
-        bytes memory eventsInitData = abi.encodeWithSelector(Events.initialize.selector, address(stubs), address(points));
+        bytes memory eventsInitData =
+            abi.encodeWithSelector(Events.initialize.selector, address(stubs), address(points));
         ERC1967Proxy eventsProxy = new ERC1967Proxy(address(eventsImpl), eventsInitData);
         Events events = Events(address(eventsProxy));
 
