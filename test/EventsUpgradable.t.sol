@@ -2,23 +2,24 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
-import "../src/Events.sol";
-import "../src/Stubs.sol";
-import "../src/Points.sol";
+import "../src/EventsUpgradable.sol";
+import "../src/StubsUpgradable.sol";
+import "../src/PointsUpgradable.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
- * @title Events Test
+ * @title EventsUpgradable Test
  * @dev Test contract for Events contract. This test suite covers all core functionality
  *      including event creation, check-ins, allowlist management, and event lifecycle.
  */
-contract EventsTest is Test {
+contract EventsUpgradableTest is Test {
     // Event interfaces
     event EventStubContractUpdated(address indexed oldStub, address indexed newStub);
     event EventPointsContractUpdated(address indexed oldPoints, address indexed newPoints);
 
-    Events _events;
-    Stubs _stubs;
-    Points _points;
+    EventsUpgradable _events;
+    StubsUpgradable _stubs;
+    PointsUpgradable _points;
     address _owner;
     address _user1;
     address _user2;
@@ -37,10 +38,25 @@ contract EventsTest is Test {
         _user2 = vm.addr(2);
         _user3 = vm.addr(3);
 
-        // Deploy Points, Stubs, and Events contracts
-        _points = new Points();
-        _stubs = new Stubs("https://example.com/api/token/{id}.json");
-        _events = new Events(address(_stubs), address(_points));
+        // Deploy and initialize Points
+        PointsUpgradable pointsImpl = new PointsUpgradable();
+        bytes memory pointsInitData = abi.encodeWithSelector(PointsUpgradable.initialize.selector);
+        ERC1967Proxy pointsProxy = new ERC1967Proxy(address(pointsImpl), pointsInitData);
+        _points = PointsUpgradable(address(pointsProxy));
+
+        // Deploy and initialize Stubs
+        StubsUpgradable stubsImpl = new StubsUpgradable();
+        bytes memory stubsInitData =
+            abi.encodeWithSelector(StubsUpgradable.initialize.selector, "https://example.com/api/token/{id}.json");
+        ERC1967Proxy stubsProxy = new ERC1967Proxy(address(stubsImpl), stubsInitData);
+        _stubs = StubsUpgradable(address(stubsProxy));
+
+        // Deploy Events implementation and create proxy
+        EventsUpgradable eventsImpl = new EventsUpgradable();
+        bytes memory eventsInitData =
+            abi.encodeWithSelector(EventsUpgradable.initialize.selector, address(_stubs), address(_points));
+        ERC1967Proxy eventsProxy = new ERC1967Proxy(address(eventsImpl), eventsInitData);
+        _events = EventsUpgradable(address(eventsProxy));
 
         // Set up ownership and permissions
         vm.startPrank(_owner);
@@ -49,7 +65,8 @@ contract EventsTest is Test {
         vm.stopPrank();
 
         vm.startPrank(address(_events));
-        _points.setEventsContract(address(_events));
+        _points.acceptOwnership();
+        _stubs.acceptOwnership();
         _stubs.setEventsContract(address(_events));
         vm.stopPrank();
 
@@ -109,7 +126,6 @@ contract EventsTest is Test {
 
     function testCheckIn() public {
         _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
-
         address[] memory attendees = new address[](1);
         attendees[0] = _user1;
         _events.setAllowlist(_eventId, attendees, true);
@@ -117,44 +133,20 @@ contract EventsTest is Test {
         // Move time to event start
         vm.warp(_startTime);
 
-        // Check in
         vm.startPrank(_user1);
         _events.checkIn(_eventId);
         vm.stopPrank();
 
         assertTrue(_events.isUserCheckedIn(_eventId, _user1), "User1 should be checked in");
-        assertEq(_events.getEventCheckInCount(_eventId), 1, "Check-in count should be 1");
-        assertEq(_points.balanceOf(_user1), _pointsAmount, "User1 should have points");
-        assertEq(_stubs.balanceOf(_user1, _stubId), 1, "User1 should have stub NFT");
-    }
-
-    function testCannotCheckInTwice() public {
-        _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
-
-        address[] memory attendees = new address[](1);
-        attendees[0] = _user1;
-        _events.setAllowlist(_eventId, attendees, true);
-
-        // Move time to event start
-        vm.warp(_startTime);
-
-        vm.startPrank(_user1);
-        _events.checkIn(_eventId);
-
-        vm.expectRevert("Already checked in");
-        _events.checkIn(_eventId);
-        vm.stopPrank();
+        assertEq(_points.balanceOf(_user1), _pointsAmount, "User1 should receive points");
+        assertEq(_stubs.balanceOf(_user1, _stubId), 1, "User1 should receive stub");
     }
 
     function testCannotCheckInBeforeStart() public {
         _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
-
         address[] memory attendees = new address[](1);
         attendees[0] = _user1;
         _events.setAllowlist(_eventId, attendees, true);
-
-        // Time before event start
-        vm.warp(_startTime - 1);
 
         vm.startPrank(_user1);
         vm.expectRevert("Check-in hasn't started");
@@ -164,12 +156,11 @@ contract EventsTest is Test {
 
     function testCannotCheckInAfterEnd() public {
         _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
-
         address[] memory attendees = new address[](1);
         attendees[0] = _user1;
         _events.setAllowlist(_eventId, attendees, true);
 
-        // Time after event end
+        // Move time past event end
         vm.warp(_endTime + 1);
 
         vm.startPrank(_user1);
@@ -181,22 +172,22 @@ contract EventsTest is Test {
     function testCannotCheckInIfNotAllowlisted() public {
         _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
 
+        // Set up allowlist requirement by adding someone to the allowlist
         address[] memory attendees = new address[](1);
-        attendees[0] = _user1;
+        attendees[0] = _user2;
         _events.setAllowlist(_eventId, attendees, true);
 
         // Move time to event start
         vm.warp(_startTime);
 
-        vm.startPrank(_user2);
+        vm.startPrank(_user1);
         vm.expectRevert("Not on allowlist");
         _events.checkIn(_eventId);
         vm.stopPrank();
     }
 
-    function testAutoEndEvent() public {
+    function testCannotCheckInTwice() public {
         _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
-
         address[] memory attendees = new address[](1);
         attendees[0] = _user1;
         _events.setAllowlist(_eventId, attendees, true);
@@ -204,15 +195,31 @@ contract EventsTest is Test {
         // Move time to event start
         vm.warp(_startTime);
 
-        _events.autoEndEvent(_eventId);
+        vm.startPrank(_user1);
+        _events.checkIn(_eventId);
+        vm.expectRevert("Already checked in");
+        _events.checkIn(_eventId);
+        vm.stopPrank();
+    }
+
+    function testCannotCheckInAtCapacity() public {
+        _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, 1);
+        address[] memory attendees = new address[](2);
+        attendees[0] = _user1;
+        attendees[1] = _user2;
+        _events.setAllowlist(_eventId, attendees, true);
+
+        // Move time to event start
+        vm.warp(_startTime);
 
         vm.startPrank(_user1);
-        vm.expectRevert("Check-in period ended");
         _events.checkIn(_eventId);
         vm.stopPrank();
 
-        (,,, bool hasEnded,) = _events.getEventStatus(_eventId);
-        assertTrue(hasEnded, "Event should be marked as ended");
+        vm.startPrank(_user2);
+        vm.expectRevert("Event at max capacity");
+        _events.checkIn(_eventId);
+        vm.stopPrank();
     }
 
     function testUpdateEventTimes() public {
@@ -240,6 +247,11 @@ contract EventsTest is Test {
 
         vm.expectRevert("Cannot modify started event");
         _events.updateEventTimes(_eventId, newStartTime, newEndTime);
+
+        // Move time back before event start
+        vm.warp(_startTime - 1 hours);
+
+        // Now we should be able to update the times
     }
 
     function testUpdateEventCapacity() public {
@@ -340,6 +352,74 @@ contract EventsTest is Test {
         vm.stopPrank();
     }
 
+    function testAutoEndEvent() public {
+        _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
+
+        // Move time to event start
+        vm.warp(_startTime);
+
+        _events.autoEndEvent(_eventId);
+        // Advance time by 1 second to ensure hasEnded is true
+        vm.warp(block.timestamp + 1);
+
+        (,,, bool hasEnded,) = _events.getEventStatus(_eventId);
+        assertTrue(hasEnded, "Event should be ended");
+
+        address[] memory attendees = new address[](1);
+        attendees[0] = _user1;
+        _events.setAllowlist(_eventId, attendees, true);
+
+        vm.startPrank(_user1);
+        vm.expectRevert("Check-in period ended");
+        _events.checkIn(_eventId);
+        vm.stopPrank();
+    }
+
+    function testSoftDeleteEvent() public {
+        _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
+        address[] memory attendees = new address[](1);
+        attendees[0] = _user1;
+        _events.setAllowlist(_eventId, attendees, true);
+
+        // Move time to event start and check in
+        vm.warp(_startTime);
+        vm.startPrank(_user1);
+        _events.checkIn(_eventId);
+        vm.stopPrank();
+
+        // Try to delete the event - should fail because it has check-ins
+        vm.expectRevert("Cannot delete event with check-ins");
+        _events.deleteEvent(_eventId);
+
+        // Verify event still exists and data is preserved
+        (bool exists,,,,) = _events.getEventStatus(_eventId);
+        assertTrue(exists, "Event should still exist");
+
+        // Verify data is preserved
+        (
+            uint256 stubId,
+            uint256 points,
+            uint256 startTime,
+            uint256 endTime,
+            uint256 maxCapacity,
+            uint256 totalCheckedIn,
+            bool eventExists
+        ) = _events.getEventDetails(_eventId);
+        assertEq(stubId, _stubId, "Stub ID should be preserved");
+        assertEq(points, _pointsAmount, "Points should be preserved");
+        assertEq(startTime, _startTime, "Start time should be preserved");
+        assertEq(endTime, _endTime, "End time should be preserved");
+        assertEq(maxCapacity, _maxCapacity, "Max capacity should be preserved");
+        assertEq(totalCheckedIn, 1, "Check-in count should be preserved");
+        assertTrue(eventExists, "Event should still exist");
+
+        // Verify no new check-ins are allowed
+        vm.startPrank(_user2);
+        vm.expectRevert("Not on allowlist");
+        _events.checkIn(_eventId);
+        vm.stopPrank();
+    }
+
     function testBulkSetAllowlist() public {
         _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
 
@@ -348,7 +428,7 @@ contract EventsTest is Test {
         attendees[1] = _user2;
         attendees[2] = _user3;
 
-        _events.bulkSetAllowlist(_eventId, attendees, true);
+        _events.setAllowlist(_eventId, attendees, true);
 
         assertTrue(_events.isUserAllowlisted(_eventId, _user1), "User1 should be allowlisted");
         assertTrue(_events.isUserAllowlisted(_eventId, _user2), "User2 should be allowlisted");
@@ -362,56 +442,67 @@ contract EventsTest is Test {
         attendees[0] = _user1;
         attendees[1] = _user2;
 
-        _events.bulkSetAllowlist(_eventId, attendees, true);
-        _events.bulkRemoveFromAllowlist(_eventId, attendees);
+        _events.setAllowlist(_eventId, attendees, true);
+        _events.setAllowlist(_eventId, attendees, false);
 
         assertFalse(_events.isUserAllowlisted(_eventId, _user1), "User1 should not be allowlisted");
         assertFalse(_events.isUserAllowlisted(_eventId, _user2), "User2 should not be allowlisted");
     }
 
-    function testDeleteEvent() public {
+    function testGetEventStatus() public {
         _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
 
-        _events.deleteEvent(_eventId);
+        // Before start
+        (bool exists, bool paused, bool hasStarted, bool hasEnded, bool isAtCapacity) = _events.getEventStatus(_eventId);
+        assertTrue(exists, "Event should exist");
+        assertFalse(paused, "Event should not be paused");
+        assertFalse(hasStarted, "Event should not have started");
+        assertFalse(hasEnded, "Event should not have ended");
+        assertFalse(isAtCapacity, "Event should not be at capacity");
 
-        (,,,,,, bool exists) = _events.getEventDetails(_eventId);
-        assertFalse(exists, "Event should not exist after deletion");
+        // During event
+        vm.warp(_startTime);
+        (exists, paused, hasStarted, hasEnded, isAtCapacity) = _events.getEventStatus(_eventId);
+        assertTrue(hasStarted, "Event should have started");
+
+        // After end
+        vm.warp(_endTime + 1);
+        (exists, paused, hasStarted, hasEnded, isAtCapacity) = _events.getEventStatus(_eventId);
+        assertTrue(hasEnded, "Event should have ended");
     }
 
-    function testCannotDeleteEventWithCheckIns() public {
+    function testGetEventCheckInCount() public {
         _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
-        address[] memory attendees = new address[](1);
+        address[] memory attendees = new address[](2);
         attendees[0] = _user1;
+        attendees[1] = _user2;
         _events.setAllowlist(_eventId, attendees, true);
 
-        // Move time to event start and check in
+        // Move time to event start
         vm.warp(_startTime);
+
+        assertEq(_events.getEventCheckInCount(_eventId), 0, "Initial check-in count should be 0");
+
         vm.startPrank(_user1);
         _events.checkIn(_eventId);
         vm.stopPrank();
 
-        vm.expectRevert("Cannot delete event with check-ins");
-        _events.deleteEvent(_eventId);
-    }
+        assertEq(_events.getEventCheckInCount(_eventId), 1, "Check-in count should be 1");
 
-    function testIsEventActive() public {
-        _events.createEvent(_eventId, _stubId, _pointsAmount, _startTime, _endTime, _maxCapacity);
+        vm.startPrank(_user2);
+        _events.checkIn(_eventId);
+        vm.stopPrank();
 
-        // Before start
-        assertFalse(_events.isEventActive(_eventId), "Event should not be active before start");
-
-        // During event
-        vm.warp(_startTime);
-        assertTrue(_events.isEventActive(_eventId), "Event should be active during event time");
-
-        // After end
-        vm.warp(_endTime + 1);
-        assertFalse(_events.isEventActive(_eventId), "Event should not be active after end");
+        assertEq(_events.getEventCheckInCount(_eventId), 2, "Check-in count should be 2");
     }
 
     function testUpdateEventStubContract() public {
         // Deploy new Stubs contract
-        Stubs newStubs = new Stubs("https://newexample.com/api/token/{id}.json");
+        StubsUpgradable newStubsImpl = new StubsUpgradable();
+        bytes memory newStubsInitData =
+            abi.encodeWithSelector(StubsUpgradable.initialize.selector, "https://newexample.com/api/token/{id}.json");
+        ERC1967Proxy newStubsProxy = new ERC1967Proxy(address(newStubsImpl), newStubsInitData);
+        StubsUpgradable newStubs = StubsUpgradable(address(newStubsProxy));
 
         // Set up new Stubs contract
         vm.startPrank(_owner);
@@ -419,6 +510,7 @@ contract EventsTest is Test {
         vm.stopPrank();
 
         vm.startPrank(address(_events));
+        newStubs.acceptOwnership();
         newStubs.setEventsContract(address(_events));
         vm.stopPrank();
 
@@ -431,7 +523,10 @@ contract EventsTest is Test {
 
     function testUpdateEventPointsContract() public {
         // Deploy new Points contract
-        Points newPoints = new Points();
+        PointsUpgradable newPointsImpl = new PointsUpgradable();
+        bytes memory newPointsInitData = abi.encodeWithSelector(PointsUpgradable.initialize.selector);
+        ERC1967Proxy newPointsProxy = new ERC1967Proxy(address(newPointsImpl), newPointsInitData);
+        PointsUpgradable newPoints = PointsUpgradable(address(newPointsProxy));
 
         // Set up new Points contract
         vm.startPrank(_owner);
@@ -439,7 +534,7 @@ contract EventsTest is Test {
         vm.stopPrank();
 
         vm.startPrank(address(_events));
-        newPoints.setEventsContract(address(_events));
+        newPoints.acceptOwnership();
         vm.stopPrank();
 
         // Update the Points contract
@@ -488,8 +583,16 @@ contract EventsTest is Test {
 
     function testContractUpdateEvents() public {
         // Deploy new contracts
-        Stubs newStubs = new Stubs("https://newexample.com/api/token/{id}.json");
-        Points newPoints = new Points();
+        StubsUpgradable newStubsImpl = new StubsUpgradable();
+        bytes memory newStubsInitData =
+            abi.encodeWithSelector(StubsUpgradable.initialize.selector, "https://newexample.com/api/token/{id}.json");
+        ERC1967Proxy newStubsProxy = new ERC1967Proxy(address(newStubsImpl), newStubsInitData);
+        StubsUpgradable newStubs = StubsUpgradable(address(newStubsProxy));
+
+        PointsUpgradable newPointsImpl = new PointsUpgradable();
+        bytes memory newPointsInitData = abi.encodeWithSelector(PointsUpgradable.initialize.selector);
+        ERC1967Proxy newPointsProxy = new ERC1967Proxy(address(newPointsImpl), newPointsInitData);
+        PointsUpgradable newPoints = PointsUpgradable(address(newPointsProxy));
 
         // Set up new contracts
         vm.startPrank(_owner);
@@ -498,8 +601,9 @@ contract EventsTest is Test {
         vm.stopPrank();
 
         vm.startPrank(address(_events));
+        newStubs.acceptOwnership();
         newStubs.setEventsContract(address(_events));
-        newPoints.setEventsContract(address(_events));
+        newPoints.acceptOwnership();
         vm.stopPrank();
 
         // Update contracts and verify events

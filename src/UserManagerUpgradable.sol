@@ -1,14 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
+import "@openzeppelin-contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin-contracts-upgradeable/utils/ContextUpgradeable.sol";
 
-/// @title UserManager Contract (Non-Upgradable)
+/// @title UserManager Contract
 /// @notice Manages user profiles and their associated addresses
 /// @dev Handles user creation, name management, and address tracking
-contract UserManager is Context, Ownable, Pausable {
+contract UserManagerUpgradable is
+    Initializable,
+    ContextUpgradeable,
+    Ownable2StepUpgradeable,
+    PausableUpgradeable,
+    UUPSUpgradeable
+{
     /// @notice Structure containing user profile information
     /// @param userId Unique identifier for the user
     /// @param username Display name of the user
@@ -37,9 +45,21 @@ contract UserManager is Context, Ownable, Pausable {
     event AddressAdded(uint256 indexed userId, address newAddress);
     event PrimaryAddressUpdated(uint256 indexed userId, address oldPrimary, address newPrimary);
 
-    constructor() Ownable(msg.sender) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize() public initializer {
+        __Context_init();
+        __Ownable2Step_init();
+        __Pausable_init();
+        __UUPSUpgradeable_init();
+        _transferOwnership(_msgSender());
         _userIdCounter = 1; // Start user IDs from 1
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /// @notice Validates a username according to ENS-like rules
     /// @param name The username to validate
@@ -187,4 +207,11 @@ contract UserManager is Context, Ownable, Pausable {
     function unpause() external onlyOwner {
         _unpause();
     }
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[46] private __gap;
 }

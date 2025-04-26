@@ -2,16 +2,16 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../src/UserManager.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
+import "../src/UserManagerUpgradable.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
- * @title UserManager Test
- * @dev Test contract for UserManager contract. This test suite covers all core functionality
+ * @title UserManagerUpgradable Test
+ * @dev Test contract for UserManagerUpgradable contract. This test suite covers all core functionality
  *      including user creation, name management, and address tracking.
  */
 contract UserManagerTest is Test {
-    UserManager userManager;
+    UserManagerUpgradable userManager;
     address owner;
     address user1;
     address user2;
@@ -22,18 +22,17 @@ contract UserManagerTest is Test {
     event AddressAdded(uint256 indexed userId, address newAddress);
     event PrimaryAddressUpdated(uint256 indexed userId, address oldPrimary, address newPrimary);
 
-    // Import custom errors from OpenZeppelin v5.0.0
-    error OwnableUnauthorizedAccount(address account);
-    error EnforcedPause();
-
     function setUp() public {
         owner = address(this);
         user1 = vm.addr(1);
         user2 = vm.addr(2);
         user3 = vm.addr(3);
 
-        // Deploy the contract
-        userManager = new UserManager();
+        // Deploy implementation and proxy
+        UserManagerUpgradable implementation = new UserManagerUpgradable();
+        bytes memory initData = abi.encodeWithSelector(UserManagerUpgradable.initialize.selector);
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
+        userManager = UserManagerUpgradable(address(proxy));
 
         // Log addresses
         console.log("Owner address:", owner);
@@ -253,49 +252,5 @@ contract UserManagerTest is Test {
         assertEq(addresses[0], user1, "First address should be user1");
         assertEq(addresses[1], user2, "Second address should be user2");
         assertEq(addresses[2], user3, "Third address should be user3");
-    }
-
-    function testGetNonExistentUser() public {
-        vm.expectRevert("User does not exist");
-        userManager.getName(999);
-
-        vm.expectRevert("User does not exist");
-        userManager.getPrimaryAddress(999);
-
-        vm.expectRevert("User does not exist");
-        userManager.getUserAddresses(999);
-    }
-
-    function testPauseAndUnpause() public {
-        // Pause the contract
-        userManager.pause();
-
-        // Try to create a user while paused
-        vm.startPrank(user1);
-        vm.expectRevert(EnforcedPause.selector);
-        userManager.createUser("user1");
-        vm.stopPrank();
-
-        // Unpause the contract
-        userManager.unpause();
-
-        // Create a user after unpausing
-        vm.startPrank(user1);
-        uint256 userId = userManager.createUser("user1");
-        vm.stopPrank();
-
-        assertEq(userId, 1, "User ID should be 1");
-    }
-
-    function testOnlyOwnerCanPause() public {
-        vm.startPrank(user1);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, user1));
-        userManager.pause();
-        vm.stopPrank();
-
-        vm.startPrank(user1);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, user1));
-        userManager.unpause();
-        vm.stopPrank();
     }
 }

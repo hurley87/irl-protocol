@@ -1,19 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
-import "./Stubs.sol";
-import "./Points.sol";
+import "@openzeppelin-contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin-contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "./StubsUpgradable.sol";
+import "./PointsUpgradable.sol";
 
 /// @title Events Contract
 /// @notice Manages event creation, check-ins, and rewards distribution
 /// @dev Handles event lifecycle, allowlist management, and points/stub distribution
-contract Events is Context, Ownable, Pausable {
+contract EventsUpgradable is
+    Initializable,
+    ContextUpgradeable,
+    Ownable2StepUpgradeable,
+    PausableUpgradeable,
+    UUPSUpgradeable
+{
     // Contract dependencies
-    Stubs public eventStub;
-    Points public eventPoints;
+    StubsUpgradable public eventStub;
+    PointsUpgradable public eventPoints;
 
     // Event data storage
     mapping(uint256 => EventInfo) public events;
@@ -71,13 +79,30 @@ contract Events is Context, Ownable, Pausable {
     event EventStubContractUpdated(address indexed oldStub, address indexed newStub);
     event EventPointsContractUpdated(address indexed oldPoints, address indexed newPoints);
 
-    /// @notice Constructor initializes the contract with required dependencies
+    // Storage gap for future upgrades
+    uint256[45] private __gap;
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @notice Initializes the contract with required dependencies
     /// @param _eventStub Address of the Stubs contract for NFT minting
     /// @param _eventPoints Address of the Points contract for points distribution
-    constructor(address _eventStub, address _eventPoints) Ownable(msg.sender) {
-        eventStub = Stubs(_eventStub);
-        eventPoints = Points(_eventPoints);
+    function initialize(address _eventStub, address _eventPoints) public initializer {
+        __UUPSUpgradeable_init();
+        __Ownable2Step_init();
+        __Pausable_init();
+        __Context_init();
+        eventStub = StubsUpgradable(_eventStub);
+        eventPoints = PointsUpgradable(_eventPoints);
+        _transferOwnership(_msgSender());
     }
+
+    /// @notice Authorizes an upgrade to a new implementation
+    /// @param newImplementation Address of the new implementation
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /// @notice Modifier to check if an event exists
     modifier eventExists(uint256 eventId) {
@@ -414,7 +439,7 @@ contract Events is Context, Ownable, Pausable {
     function updateEventStubContract(address newStub) external onlyOwner whenNotPaused {
         require(newStub != address(0), "Invalid Stubs contract address");
         address oldStub = address(eventStub);
-        eventStub = Stubs(newStub);
+        eventStub = StubsUpgradable(newStub);
         emit EventStubContractUpdated(oldStub, newStub);
     }
 
@@ -424,7 +449,7 @@ contract Events is Context, Ownable, Pausable {
     function updateEventPointsContract(address newPoints) external onlyOwner whenNotPaused {
         require(newPoints != address(0), "Invalid Points contract address");
         address oldPoints = address(eventPoints);
-        eventPoints = Points(newPoints);
+        eventPoints = PointsUpgradable(newPoints);
         emit EventPointsContractUpdated(oldPoints, newPoints);
     }
 }

@@ -2,9 +2,9 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
-import "../src/Events.sol";
-import "../src/Stubs.sol";
-import "../src/Points.sol";
+import "../src/EventsUpgradable.sol";
+import "../src/StubsUpgradable.sol";
+import "../src/PointsUpgradable.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
@@ -20,23 +20,23 @@ contract DeployScript is Script {
         vm.broadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
 
         // Deploy Points implementation and proxy
-        Points pointsImpl = new Points();
-        bytes memory pointsInitData = abi.encodeWithSelector(Points.initialize.selector);
+        PointsUpgradable pointsImpl = new PointsUpgradable();
+        bytes memory pointsInitData = abi.encodeWithSelector(PointsUpgradable.initialize.selector);
         ERC1967Proxy pointsProxy = new ERC1967Proxy(address(pointsImpl), pointsInitData);
-        Points points = Points(address(pointsProxy));
+        PointsUpgradable points = PointsUpgradable(address(pointsProxy));
 
         // Deploy Stubs implementation and proxy
-        Stubs stubsImpl = new Stubs();
-        bytes memory stubsInitData = abi.encodeWithSelector(Stubs.initialize.selector, "");
+        StubsUpgradable stubsImpl = new StubsUpgradable();
+        bytes memory stubsInitData = abi.encodeWithSelector(StubsUpgradable.initialize.selector, "");
         ERC1967Proxy stubsProxy = new ERC1967Proxy(address(stubsImpl), stubsInitData);
-        Stubs stubs = Stubs(address(stubsProxy));
+        StubsUpgradable stubs = StubsUpgradable(address(stubsProxy));
 
         // Deploy Events implementation and proxy
-        Events eventsImpl = new Events();
+        EventsUpgradable eventsImpl = new EventsUpgradable();
         bytes memory eventsInitData =
-            abi.encodeWithSelector(Events.initialize.selector, address(stubs), address(points));
+            abi.encodeWithSelector(EventsUpgradable.initialize.selector, address(stubs), address(points));
         ERC1967Proxy eventsProxy = new ERC1967Proxy(address(eventsImpl), eventsInitData);
-        Events events = Events(address(eventsProxy));
+        EventsUpgradable events = EventsUpgradable(address(eventsProxy));
 
         // Transfer ownership of Points and Stubs to Events contract
         points.transferOwnership(address(events));
